@@ -17,7 +17,10 @@ export default function OrderPage() {
             Pesanan kamu sudah diterima. Silakan cek WhatsApp untuk konfirmasi dari penjual.
           </p>
           <div className="order-code animate-fade-up animate-delay-2">#{params.code}</div>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 36 }} className="animate-fade-up animate-delay-3">
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 36, flexWrap: 'wrap' }} className="animate-fade-up animate-delay-3">
+            <Link href={`/track?code=${params.code}`} className="btn btn-outline" style={{ padding: '14px 32px', fontSize: 15 }}>
+              📍 Lacak Pesanan
+            </Link>
             <Link href="/" className="btn btn-primary" style={{ padding: '14px 32px', fontSize: 15 }}>
               🛍️ Belanja Lagi
             </Link>
