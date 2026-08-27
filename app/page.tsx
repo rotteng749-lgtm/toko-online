@@ -18,12 +18,17 @@ export default function HomePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [storeName, setStoreName] = useState('Toko Online');
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('cart');
     if (saved) setCart(JSON.parse(saved));
     fetch('/api/products?limit=100').then(r => r.json()).then(d => { if (d.ok) setProducts(d.products); });
     fetch('/api/categories').then(r => r.json()).then(d => { if (d.ok) setCategories(d.categories); });
+
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   useEffect(() => { localStorage.setItem('cart', JSON.stringify(cart)); }, [cart]);
@@ -68,11 +73,9 @@ export default function HomePage() {
   const formatIDR = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
   return (
-    <div className="page-enter">
-      <div className="ambient-bg" />
-
+    <div>
       {/* Header */}
-      <header className="header">
+      <header className={`header${scrolled ? ' scrolled' : ''}`}>
         <div className="header-inner">
           <Link href="/" className="logo">{storeName}</Link>
           <div className="header-actions">
@@ -80,11 +83,13 @@ export default function HomePage() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input placeholder="Cari produk..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <Link href="/track" className="btn btn-outline btn-sm" style={{ padding: '8px 16px' }}>
-              📍 Lacak
+            <Link href="/track" className="btn btn-outline btn-sm header-link" title="Lacak Pesanan">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span className="header-link-text">Lacak</span>
             </Link>
-            <Link href="/admin" className="btn btn-outline btn-sm" style={{ padding: '8px 16px' }}>
-              ⚡ Admin
+            <Link href="/admin" className="btn btn-outline btn-sm header-link" title="Admin Panel">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span className="header-link-text">Admin</span>
             </Link>
           </div>
         </div>
@@ -93,22 +98,35 @@ export default function HomePage() {
       <div className="container">
         {/* Hero */}
         <div className="hero">
-          <h1 className="animate-fade-up">
+          <div className="hero-badge animate-fade-up">✨ Belanja Online Terpercaya</div>
+          <h1 className="animate-fade-up animate-delay-1">
             Belanja <span className="gradient-text">Mudah</span>,<br />
             Kirim <span className="gradient-text-2">via WhatsApp</span>
           </h1>
-          <p className="animate-fade-up animate-delay-1">
+          <p className="animate-fade-up animate-delay-2">
             Temukan produk terbaikmu dan pesan langsung lewat WhatsApp. Cepat, praktis, tanpa ribet.
           </p>
-          <div className="hero-stats animate-fade-up animate-delay-2">
+          <div className="hero-actions animate-fade-up animate-delay-3">
+            <a href="#products" className="btn btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Mulai Belanja
+            </a>
+            <Link href="/track" className="btn btn-outline">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Lacak Pesanan
+            </Link>
+          </div>
+          <div className="hero-stats animate-fade-up animate-delay-4">
             <div className="hero-stat">
               <div className="hero-stat-value">{products.length}</div>
               <div className="hero-stat-label">Produk</div>
             </div>
+            <div className="hero-stat-divider" />
             <div className="hero-stat">
               <div className="hero-stat-value">{categories.length}</div>
               <div className="hero-stat-label">Kategori</div>
             </div>
+            <div className="hero-stat-divider" />
             <div className="hero-stat">
               <div className="hero-stat-value">⚡</div>
               <div className="hero-stat-label">Fast Order</div>
@@ -117,7 +135,10 @@ export default function HomePage() {
         </div>
 
         {/* Categories */}
-        <div className="categories animate-fade-up animate-delay-3">
+        <div id="products" className="section-bar animate-fade-up">
+          <h2 className="section-bar-title">Produk Kami</h2>
+        </div>
+        <div className="categories animate-fade-up animate-delay-1">
           <button className={`cat-pill${activeCat === '' ? ' active' : ''}`} onClick={() => setActiveCat('')}>
             <span>✨ Semua</span>
           </button>
@@ -151,6 +172,9 @@ export default function HomePage() {
                       alt={p.name}
                       loading="lazy"
                     />
+                    <div className="product-card-overlay">
+                      <span className="product-card-view">Lihat Produk →</span>
+                    </div>
                   </div>
                   <div className="product-card-body">
                     <div className="product-card-cat">{p.category_name}</div>
@@ -169,6 +193,24 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-inner">
+          <div className="footer-brand">
+            <div className="logo" style={{ fontSize: 18 }}>{storeName}</div>
+            <p>Belanja mudah, kirim via WhatsApp.</p>
+          </div>
+          <div className="footer-links">
+            <Link href="/">🏠 Beranda</Link>
+            <Link href="/track">📍 Lacak Pesanan</Link>
+            <Link href="/admin">⚡ Admin</Link>
+          </div>
+          <div className="footer-bottom">
+            © {new Date().getFullYear()} {storeName}. All rights reserved.
+          </div>
+        </div>
+      </footer>
 
       {/* Cart FAB */}
       {cartCount > 0 && (

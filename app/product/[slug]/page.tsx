@@ -1,151 +1,156 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-interface Product {
-  id: number; name: string; slug: string; description: string;
-  price: number; sale_price: number; stock: number; image_url: string;
-  category_name: string; category_slug: string;
-}
+interface Product { id: number; name: string; slug: string; price: number; sale_price: number; stock: number; image_url: string; description: string; category_name: string; }
+interface CartItem { product: Product; qty: number; }
 
 export default function ProductPage() {
   const params = useParams();
-  const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [cart, setCart] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    fetch(`/api/products?search=${params.slug}`).then(r => r.json()).then(d => {
-      if (d.ok && d.products.length > 0) {
-        setProduct(d.products.find((p: Product) => p.slug === params.slug) || d.products[0]);
+    const saved = localStorage.getItem('cart');
+    if (saved) setCart(JSON.parse(saved));
+    fetch(`/api/products?limit=100`).then(r => r.json()).then(d => {
+      if (d.ok) {
+        const p = d.products.find((p: Product) => p.slug === params.slug);
+        if (p) setProduct(p);
       }
-      setLoading(false);
     });
   }, [params.slug]);
 
+  useEffect(() => { localStorage.setItem('cart', JSON.stringify(cart)); }, [cart]);
+
   const addToCart = () => {
     if (!product) return;
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    const existing = cart.find((i: any) => i.product.id === product.id);
-    if (existing) existing.qty += qty;
-    else cart.push({ product, qty });
-    localStorage.setItem('cart', JSON.stringify(cart));
-    (window as any).showToast?.(`${product.name} ditambahkan ke keranjang`, 'success');
-    setTimeout(() => router.push('/'), 800);
+    setCart(prev => {
+      const existing = prev.find(i => i.product.id === product.id);
+      if (existing) return prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + qty } : i);
+      return [...prev, { product, qty }];
+    });
+    (window as any).showToast?.(`${product.name} × ${qty} ditambahkan ke keranjang`, 'success');
   };
 
   const formatIDR = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
+  const discount = product?.sale_price && product?.price ? Math.round((1 - product.sale_price / product.price) * 100) : 0;
 
-  if (loading) return (
-    <div style={{ textAlign: 'center', padding: 120, color: 'var(--text-muted)' }}>
-      <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
-      Memuat...
-    </div>
-  );
   if (!product) return (
-    <div style={{ textAlign: 'center', padding: 120 }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-      <div style={{ fontSize: 18, fontWeight: 600 }}>Produk tidak ditemukan</div>
+    <div className="page-enter">
+      <div className="ambient-bg" />
+      <div className="container" style={{ padding: '60px 20px', textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+        <div style={{ color: 'var(--text-muted)' }}>Memuat produk...</div>
+      </div>
     </div>
   );
 
   return (
     <div className="page-enter">
       <div className="ambient-bg" />
-      <div className="container">
-        <div style={{ padding: '20px 0' }}>
-          <Link href="/" className="back-link">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>
-            Kembali ke toko
+
+      {/* Minimal header */}
+      <header className="header">
+        <div className="header-inner">
+          <Link href="/" className="logo" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ WebkitTextFillColor: 'var(--accent)' }}>
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Kembali
+          </Link>
+          <Link href="/track" className="btn btn-outline btn-sm">
+            📍 Lacak Pesanan
           </Link>
         </div>
+      </header>
 
+      <div className="container">
         <div className="product-detail">
+          {/* Gallery */}
           <div className="product-gallery animate-fade-up">
             <img
               src={product.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&h=600&fit=crop'}
               alt={product.name}
             />
+            {discount > 0 && (
+              <div className="badge-sale" style={{ top: 20, left: 20 }}>-{discount}%</div>
+            )}
           </div>
 
+          {/* Info */}
           <div className="product-info animate-fade-up animate-delay-1">
-            <div style={{
-              display: 'inline-block', fontSize: 11, fontWeight: 700,
-              color: 'var(--accent-2)', textTransform: 'uppercase',
-              letterSpacing: '0.08em', marginBottom: 12,
-              background: 'rgba(108,92,231,0.1)', padding: '5px 14px',
-              borderRadius: 999,
-            }}>
-              {product.category_name}
-            </div>
+            <div className="product-card-cat" style={{ marginBottom: 12 }}>{product.category_name}</div>
             <h1>{product.name}</h1>
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 20 }}>
+            <div className="product-price-block">
               <span className="price" style={{ fontSize: 32 }}>
                 {formatIDR(product.sale_price > 0 ? product.sale_price : product.price)}
               </span>
               {product.sale_price > 0 && (
-                <span className="price-old" style={{ fontSize: 16 }}>{formatIDR(product.price)}</span>
+                <span className="price-old" style={{ fontSize: 18 }}>{formatIDR(product.price)}</span>
+              )}
+              {discount > 0 && (
+                <span className="discount-pill">-{discount}%</span>
               )}
             </div>
 
-            <div style={{
-              marginTop: 12, fontSize: 14, fontWeight: 600,
-              color: product.stock > 0 ? 'var(--wa-green)' : 'var(--danger)',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
+            <div className={`product-stock-badge ${product.stock > 0 ? 'in-stock' : 'out-stock'}`}>
               {product.stock > 0 ? (
-                <>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: 'var(--wa-green)', display: 'inline-block',
-                    boxShadow: '0 0 8px rgba(0,212,126,0.5)',
-                  }} />
-                  Stok tersedia ({product.stock})
-                </>
+                <>✓ Stok tersedia: {product.stock} item</>
               ) : (
-                <>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: 'var(--danger)', display: 'inline-block',
-                  }} />
-                  Stok habis
-                </>
+                <>✗ Stok habis</>
               )}
             </div>
 
             {product.description && (
-              <div style={{
-                marginTop: 28, padding: 20, borderRadius: 'var(--radius-sm)',
-                background: 'var(--glass)', border: '1px solid var(--border)',
-                color: 'var(--text-secondary)', lineHeight: 1.8, fontSize: 15,
-              }}>
-                {product.description}
-              </div>
+              <div className="desc">{product.description}</div>
             )}
 
-            {product.stock > 0 && (
-              <div style={{
-                marginTop: 36, display: 'flex', gap: 16, alignItems: 'center',
-              }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  background: 'var(--glass)', border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)', padding: '8px 6px',
-                  backdropFilter: 'blur(10px)',
-                }}>
-                  <button className="qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 40, borderRadius: 12 }}>-</button>
-                  <span style={{ fontSize: 18, fontWeight: 800, minWidth: 32, textAlign: 'center', fontFamily: 'var(--font-display)' }}>{qty}</span>
-                  <button className="qty-btn" onClick={() => setQty(q => Math.min(product.stock, q + 1))} style={{ width: 40, height: 40, borderRadius: 12 }}>+</button>
-                </div>
-                <button className="btn btn-primary" onClick={addToCart} style={{ flex: 1, padding: 16, fontSize: 15 }}>
-                  🛒 Tambah ke Keranjang
-                </button>
+            {/* Qty selector */}
+            <div className="qty-selector">
+              <label>Jumlah</label>
+              <div className="qty-controls">
+                <button className="qty-btn" onClick={() => setQty(Math.max(1, qty - 1))} disabled={qty <= 1}>−</button>
+                <span className="qty-display">{qty}</span>
+                <button className="qty-btn" onClick={() => setQty(Math.min(product.stock, qty + 1))} disabled={qty >= product.stock}>+</button>
               </div>
-            )}
+            </div>
+
+            {/* Total */}
+            <div className="product-total">
+              <span>Subtotal</span>
+              <span className="price" style={{ fontSize: 24 }}>
+                {formatIDR((product.sale_price > 0 ? product.sale_price : product.price) * qty)}
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="product-actions">
+              <button className="btn btn-primary product-add-btn" onClick={addToCart} disabled={product.stock <= 0}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                {product.stock > 0 ? 'Tambah ke Keranjang' : 'Stok Habis'}
+              </button>
+            </div>
+
+            {/* Trust badges */}
+            <div className="trust-badges">
+              <div className="trust-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--wa-green)" strokeWidth="2" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <span>Bayar via WhatsApp</span>
+              </div>
+              <div className="trust-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" strokeWidth="2" strokeLinecap="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                <span>Pengiriman cepat</span>
+              </div>
+              <div className="trust-badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>Produk berkualitas</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
