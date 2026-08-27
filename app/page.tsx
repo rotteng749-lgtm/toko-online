@@ -19,7 +19,6 @@ export default function HomePage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [storeName, setStoreName] = useState('Toko Online');
 
-  // Load cart from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('cart');
     if (saved) setCart(JSON.parse(saved));
@@ -27,10 +26,8 @@ export default function HomePage() {
     fetch('/api/categories').then(r => r.json()).then(d => { if (d.ok) setCategories(d.categories); });
   }, []);
 
-  // Save cart to localStorage
   useEffect(() => { localStorage.setItem('cart', JSON.stringify(cart)); }, [cart]);
 
-  // Fetch products with filters
   const fetchProducts = useCallback(async () => {
     const params = new URLSearchParams({ limit: '100' });
     if (activeCat) params.set('category', activeCat);
@@ -45,22 +42,18 @@ export default function HomePage() {
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(i => i.product.id === product.id);
-      if (existing) {
-        return prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i);
-      }
+      if (existing) return prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, { product, qty: 1 }];
     });
     (window as any).showToast?.(`${product.name} ditambahkan ke keranjang`, 'success');
   };
 
   const updateQty = (productId: number, delta: number) => {
-    setCart(prev => {
-      return prev.map(i => {
-        if (i.product.id !== productId) return i;
-        const newQty = i.qty + delta;
-        return newQty > 0 ? { ...i, qty: newQty } : i;
-      }).filter(i => i.qty > 0);
-    });
+    setCart(prev => prev.map(i => {
+      if (i.product.id !== productId) return i;
+      const newQty = i.qty + delta;
+      return newQty > 0 ? { ...i, qty: newQty } : i;
+    }).filter(i => i.qty > 0));
   };
 
   const removeFromCart = (productId: number) => {
@@ -71,56 +64,90 @@ export default function HomePage() {
     const price = i.product.sale_price > 0 ? i.product.sale_price : i.product.price;
     return sum + price * i.qty;
   }, 0);
-
   const cartCount = cart.reduce((sum, i) => sum + i.qty, 0);
-
   const formatIDR = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
   return (
-    <div>
+    <div className="page-enter">
+      <div className="ambient-bg" />
+
       {/* Header */}
       <header className="header">
         <div className="header-inner">
           <Link href="/" className="logo">{storeName}</Link>
-          <div className="search-bar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input placeholder="Cari produk..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="header-actions">
+            <div className="search-bar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input placeholder="Cari produk..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <Link href="/admin" className="btn btn-outline btn-sm" style={{ padding: '8px 16px' }}>
+              ⚡ Admin
+            </Link>
           </div>
         </div>
       </header>
 
       <div className="container">
+        {/* Hero */}
+        <div className="hero">
+          <h1 className="animate-fade-up">
+            Belanja <span className="gradient-text">Mudah</span>,<br />
+            Kirim <span className="gradient-text-2">via WhatsApp</span>
+          </h1>
+          <p className="animate-fade-up animate-delay-1">
+            Temukan produk terbaikmu dan pesan langsung lewat WhatsApp. Cepat, praktis, tanpa ribet.
+          </p>
+          <div className="hero-stats animate-fade-up animate-delay-2">
+            <div className="hero-stat">
+              <div className="hero-stat-value">{products.length}</div>
+              <div className="hero-stat-label">Produk</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-value">{categories.length}</div>
+              <div className="hero-stat-label">Kategori</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-value">⚡</div>
+              <div className="hero-stat-label">Fast Order</div>
+            </div>
+          </div>
+        </div>
+
         {/* Categories */}
-        <div className="categories">
+        <div className="categories animate-fade-up animate-delay-3">
           <button className={`cat-pill${activeCat === '' ? ' active' : ''}`} onClick={() => setActiveCat('')}>
-            Semua
+            <span>✨ Semua</span>
           </button>
           {categories.map(c => (
             <button key={c.id} className={`cat-pill${activeCat === c.slug ? ' active' : ''}`} onClick={() => setActiveCat(c.slug)}>
-              {c.name} ({c.product_count})
+              <span>{c.name} ({c.product_count})</span>
             </button>
           ))}
         </div>
 
         {/* Product Grid */}
         {products.length === 0 ? (
-          <div className="empty-state">
+          <div className="empty-state animate-fade-up">
             <div className="icon">📦</div>
             <h3>Belum ada produk</h3>
             <p>Produk akan segera tersedia</p>
           </div>
         ) : (
           <div className="product-grid">
-            {products.map(p => (
+            {products.map((p, idx) => (
               <Link key={p.id} href={`/product/${p.slug}`}>
-                <div className="product-card">
+                <div className="product-card" style={{ animationDelay: `${idx * 0.05}s` }}>
                   {p.sale_price > 0 && (
                     <div className="badge-sale">
                       -{Math.round((1 - p.sale_price / p.price) * 100)}%
                     </div>
                   )}
                   <div className="product-card-img">
-                    <img src={p.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop'} alt={p.name} loading="lazy" />
+                    <img
+                      src={p.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop'}
+                      alt={p.name}
+                      loading="lazy"
+                    />
                   </div>
                   <div className="product-card-body">
                     <div className="product-card-cat">{p.category_name}</div>
@@ -129,7 +156,9 @@ export default function HomePage() {
                       <span className="price">{formatIDR(p.sale_price > 0 ? p.sale_price : p.price)}</span>
                       {p.sale_price > 0 && <span className="price-old">{formatIDR(p.price)}</span>}
                     </div>
-                    <div className="badge-stock">{p.stock > 0 ? `Stok: ${p.stock}` : 'Habis'}</div>
+                    <div className={`badge-stock${p.stock > 0 ? ' in-stock' : ''}`}>
+                      {p.stock > 0 ? `✓ Stok: ${p.stock}` : '✗ Habis'}
+                    </div>
                   </div>
                 </div>
               </Link>
@@ -141,7 +170,7 @@ export default function HomePage() {
       {/* Cart FAB */}
       {cartCount > 0 && (
         <button className="cart-fab" onClick={() => setCartOpen(true)}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
           <span className="cart-count">{cartCount}</span>
         </button>
       )}
@@ -151,13 +180,14 @@ export default function HomePage() {
       <div className={`cart-drawer${cartOpen ? ' open' : ''}`}>
         <div className="cart-header">
           <h2>🛒 Keranjang ({cartCount})</h2>
-          <button className="btn btn-icon btn-outline" onClick={() => setCartOpen(false)} style={{ width: 36, height: 36, borderRadius: 10, fontSize: 18 }}>✕</button>
+          <button className="btn btn-icon btn-outline" onClick={() => setCartOpen(false)} style={{ width: 38, height: 38, borderRadius: 12, fontSize: 18 }}>✕</button>
         </div>
 
         {cart.length === 0 ? (
           <div className="cart-empty">
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🛒</div>
-            <p>Keranjang kosong</p>
+            <div className="empty-icon">🛒</div>
+            <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Keranjang kosong</p>
+            <p style={{ fontSize: 13 }}>Yuk mulai belanja!</p>
           </div>
         ) : (
           <>
@@ -185,20 +215,17 @@ export default function HomePage() {
             <div className="cart-footer">
               <div className="cart-total">
                 <span>Total</span>
-                <span style={{ color: 'var(--accent)' }}>{formatIDR(cartTotal)}</span>
+                <span className="price">{formatIDR(cartTotal)}</span>
               </div>
-              <Link href="/checkout" className="btn btn-primary" style={{ width: '100%', padding: 14, fontSize: 15 }}
-                onClick={() => {
-                  localStorage.setItem('cart', JSON.stringify(cart));
-                }}>
-                Checkout →
+              <Link href="/checkout" className="btn btn-wa" style={{ width: '100%', fontSize: 15 }}
+                onClick={() => localStorage.setItem('cart', JSON.stringify(cart))}>
+                💬 Checkout via WhatsApp
               </Link>
             </div>
           </>
         )}
       </div>
 
-      {/* Toast container */}
       <div id="toast-container" className="toast-container" />
       <script src="/app.js" async />
     </div>

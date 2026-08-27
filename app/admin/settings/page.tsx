@@ -17,30 +17,38 @@ export default function AdminSettings() {
   const save = async (updates: Record<string, string>) => {
     setSettings({ ...settings, ...updates });
     await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
-    (window as any).showToast?.('Pengaturan disimpan', 'success');
+    (window as any).showToast?.('✅ Pengaturan disimpan', 'success');
   };
 
   const savePassword = async () => {
     if (!newPass) return;
     await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ admin_pass: newPass }) });
     setNewPass('');
-    (window as any).showToast?.('Password diubah', 'success');
+    (window as any).showToast?.('🔒 Password diubah', 'success');
   };
 
-  if (loading) return <div style={{ padding: 40, color: 'var(--text-muted)', textAlign: 'center' }}>Memuat...</div>;
+  if (loading) return (
+    <div style={{ padding: 60, color: 'var(--text-muted)', textAlign: 'center' }}>
+      <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+      Memuat pengaturan...
+    </div>
+  );
 
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 24 }}>Pengaturan</h1>
+      <div className="section-header animate-fade-up">
+        <h1>Pengaturan</h1>
+        <p>Konfigurasi toko kamu</p>
+      </div>
 
-      <div style={{ display: 'grid', gap: 20, maxWidth: 700 }}>
+      <div style={{ display: 'grid', gap: 24, maxWidth: 720 }}>
         {/* Store Info */}
-        <div className="admin-card">
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>🛒 Informasi Toko</h2>
+        <div className="admin-card animate-fade-up animate-delay-1">
+          <h2>🛒 Informasi Toko</h2>
           <div className="form-group">
             <label className="form-label">Nama Toko</label>
             <input className="form-input" value={settings.store_name || ''} onChange={e => setSettings({ ...settings, store_name: e.target.value })}
-              onBlur={() => save({ store_name: settings.store_name })} />
+              onBlur={() => save({ store_name: settings.store_name })} placeholder="Nama toko kamu" />
           </div>
           <div className="form-group">
             <label className="form-label">Nomor WhatsApp (format: 628xxx)</label>
@@ -50,7 +58,7 @@ export default function AdminSettings() {
           <div className="form-group">
             <label className="form-label">Alamat Toko</label>
             <textarea className="form-textarea" value={settings.store_address || ''} onChange={e => setSettings({ ...settings, store_address: e.target.value })}
-              onBlur={() => save({ store_address: settings.store_address })} />
+              onBlur={() => save({ store_address: settings.store_address })} placeholder="Alamat lengkap toko" />
           </div>
           <div className="form-group">
             <label className="form-label">Info Rekening / Pembayaran</label>
@@ -65,14 +73,37 @@ export default function AdminSettings() {
         </div>
 
         {/* Security */}
-        <div className="admin-card">
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>🔒 Keamanan</h2>
+        <div className="admin-card animate-fade-up animate-delay-2">
+          <h2>🔒 Keamanan</h2>
           <div className="form-group">
             <label className="form-label">Ubah Password Admin</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
               <input className="form-input" type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Password baru" style={{ flex: 1 }} />
-              <button className="btn btn-primary btn-sm" onClick={savePassword}>Simpan</button>
+              <button className="btn btn-primary btn-sm" onClick={savePassword}>💾 Simpan</button>
             </div>
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div className="admin-card animate-fade-up animate-delay-3">
+          <h2>👁️ Preview Link</h2>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <a href="/" target="_blank" style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
+              borderRadius: 'var(--radius-xs)', background: 'var(--glass)',
+              border: '1px solid var(--border)', transition: 'all 0.2s',
+              color: 'var(--accent-2)', fontWeight: 500, fontSize: 14,
+            }}>
+              🌐 Buka Toko
+            </a>
+            <a href="/admin" target="_blank" style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
+              borderRadius: 'var(--radius-xs)', background: 'var(--glass)',
+              border: '1px solid var(--border)', transition: 'all 0.2s',
+              color: 'var(--accent-2)', fontWeight: 500, fontSize: 14,
+            }}>
+              ⚡ Panel Admin
+            </a>
           </div>
         </div>
       </div>

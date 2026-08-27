@@ -26,27 +26,87 @@ export default function AdminLogin() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
-      <div style={{ width: '100%', maxWidth: 400, padding: 32 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🛍️</div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#f1f5f9' }}>Toko Admin</h1>
-          <p style={{ color: '#94a3b8', marginTop: 8 }}>Masuk ke panel admin</p>
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--bg)', position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Background effects */}
+      <div style={{
+        position: 'absolute', top: '-200px', left: '50%', transform: 'translateX(-50%)',
+        width: '600px', height: '600px',
+        background: 'radial-gradient(circle, rgba(108,92,231,0.15) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '-200px', right: '-100px',
+        width: '400px', height: '400px',
+        background: 'radial-gradient(circle, rgba(253,121,168,0.08) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      <div style={{ width: '100%', maxWidth: 420, padding: 32, position: 'relative', zIndex: 1 }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }} className="animate-fade-up">
+          <div style={{
+            width: 72, height: 72, borderRadius: 20, margin: '0 auto 20px',
+            background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 36,
+            boxShadow: '0 8px 30px rgba(108,92,231,0.3)',
+          }}>
+            🛍️
+          </div>
+          <h1 style={{
+            fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 900,
+            background: 'var(--accent-gradient)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text', marginBottom: 8,
+          }}>
+            Toko Admin
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Masuk ke panel admin</p>
         </div>
-        <form onSubmit={handleLogin} style={{ background: '#1e293b', padding: 28, borderRadius: 16 }}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#94a3b8', marginBottom: 6 }}>Username</label>
-            <input style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #334155', borderRadius: 10, fontSize: 14, background: '#0f172a', color: '#f1f5f9', outline: 'none', fontFamily: 'inherit' }}
-              value={username} onChange={e => setUsername(e.target.value)} autoFocus />
+
+        <form onSubmit={handleLogin} style={{
+          background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)', padding: 32,
+          backdropFilter: 'blur(20px)',
+        }} className="animate-fade-up animate-delay-1">
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Username</label>
+            <input style={{
+              width: '100%', padding: '14px 16px', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-xs)', fontSize: 14, background: 'var(--glass)',
+              color: 'var(--text)', outline: 'none', fontFamily: 'var(--font)',
+              transition: 'all 0.3s', backdropFilter: 'blur(10px)',
+            }}
+              value={username} onChange={e => setUsername(e.target.value)} autoFocus
+              onFocus={e => { e.target.style.borderColor = 'rgba(108,92,231,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(108,92,231,0.1)'; }}
+              onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
+            />
           </div>
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#94a3b8', marginBottom: 6 }}>Password</label>
-            <input type="password" style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #334155', borderRadius: 10, fontSize: 14, background: '#0f172a', color: '#f1f5f9', outline: 'none', fontFamily: 'inherit' }}
-              value={password} onChange={e => setPassword(e.target.value)} />
+          <div style={{ marginBottom: 28 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Password</label>
+            <input type="password" style={{
+              width: '100%', padding: '14px 16px', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-xs)', fontSize: 14, background: 'var(--glass)',
+              color: 'var(--text)', outline: 'none', fontFamily: 'var(--font)',
+              transition: 'all 0.3s', backdropFilter: 'blur(10px)',
+            }}
+              value={password} onChange={e => setPassword(e.target.value)}
+              onFocus={e => { e.target.style.borderColor = 'rgba(108,92,231,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(108,92,231,0.1)'; }}
+              onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
+            />
           </div>
-          {error && <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(220,38,38,0.15)', color: '#fca5a5', fontSize: 13, marginBottom: 16 }}>{error}</div>}
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: 14, fontSize: 15 }} disabled={loading}>
-            {loading ? 'Masuk...' : 'Masuk'}
+          {error && (
+            <div style={{
+              padding: '12px 16px', borderRadius: 'var(--radius-xs)',
+              background: 'rgba(255,107,107,0.1)', color: '#f87171',
+              fontSize: 13, marginBottom: 20, border: '1px solid rgba(255,107,107,0.15)',
+            }}>
+              {error}
+            </div>
+          )}
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: 16, fontSize: 15 }} disabled={loading}>
+            {loading ? '⏳ Masuk...' : '🚀 Masuk'}
           </button>
         </form>
       </div>
