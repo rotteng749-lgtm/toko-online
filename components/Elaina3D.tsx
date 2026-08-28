@@ -30,62 +30,54 @@ export default function Elaina3D() {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       container.appendChild(renderer.domElement);
 
-      // ===== BRIGHT LIGHTING =====
+      // Bright lighting
       scene.add(new THREE.AmbientLight(0xffffff, 2.0));
-
-      const key = new THREE.DirectionalLight(0xffffff, 3.0);
-      key.position.set(4, 10, 8);
-      scene.add(key);
-
-      const fill = new THREE.DirectionalLight(0xffeef5, 1.5);
-      fill.position.set(-5, 6, 4);
-      scene.add(fill);
-
-      const rim = new THREE.DirectionalLight(0xe8c0ff, 1.0);
-      rim.position.set(0, 4, -8);
-      scene.add(rim);
-
-      const front = new THREE.PointLight(0xfff5f8, 1.5, 30);
-      front.position.set(0, 2, 8);
-      scene.add(front);
-
-      const top = new THREE.PointLight(0xffffff, 1.0, 25);
-      top.position.set(0, 12, 0);
-      scene.add(top);
-
-      // Bottom fill to illuminate face/chin area
-      const bottom = new THREE.PointLight(0xffe8f0, 0.8, 20);
-      bottom.position.set(0, -1, 5);
-      scene.add(bottom);
+      const dl1 = new THREE.DirectionalLight(0xffffff, 3.0);
+      dl1.position.set(4, 10, 8);
+      scene.add(dl1);
+      const dl2 = new THREE.DirectionalLight(0xffeef5, 1.5);
+      dl2.position.set(-5, 6, 4);
+      scene.add(dl2);
+      const dl3 = new THREE.DirectionalLight(0xe8c0ff, 1.0);
+      dl3.position.set(0, 4, -8);
+      scene.add(dl3);
+      const pl1 = new THREE.PointLight(0xfff5f8, 1.5, 30);
+      pl1.position.set(0, 2, 8);
+      scene.add(pl1);
+      const pl2 = new THREE.PointLight(0xffffff, 1.0, 25);
+      pl2.position.set(0, 12, 0);
+      scene.add(pl2);
+      const pl3 = new THREE.PointLight(0xffe8f0, 0.8, 20);
+      pl3.position.set(0, -1, 5);
+      scene.add(pl3);
 
       // Loading
       const loadingDiv = document.createElement('div');
       loadingDiv.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#ffb7d5;font-size:14px;z-index:2;font-family:Inter,sans-serif;';
       loadingDiv.innerHTML = '<div style="width:40px;height:40px;border:3px solid rgba(255,183,213,0.2);border-top-color:#ffb7d5;border-radius:50%;animation:spin 0.8s linear infinite;"></div><span>Loading Elaina 3D...</span>';
       container.appendChild(loadingDiv);
-
       const styleTag = document.createElement('style');
       styleTag.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
       document.head.appendChild(styleTag);
 
-      // Textures
+      // ===== LOAD TEXTURES =====
       const tl = new THREE.TextureLoader();
       const texDir = '/models/elaina/';
+
       function loadTex(name: string): any {
         const t = tl.load(texDir + name);
         t.colorSpace = THREE.SRGBColorSpace;
         return t;
       }
 
+      const texFace = loadTex('Face_Body_Base_Color.png');
       const texHair = loadTex('Hair_Base_Color.png');
       const texClothes = loadTex('Clothes.png');
-      const texFace = loadTex('Face_Body_Base_Color.png');
       const texEye = loadTex('Eye.png');
 
       // ===== LOAD FBX =====
       const loader = new FBXLoader();
-      let model: any | null = null;
-      let headBone: any | null = null;
+      let model: any = null;
 
       loader.load('/models/elaina/Elaina.fbx', (fbx) => {
         if (cancelled) return;
@@ -101,129 +93,114 @@ export default function Elaina3D() {
         fbx.position.sub(center.multiplyScalar(scale));
         fbx.position.y -= box.min.y * scale;
 
-        // Debug: log all mesh names and material names
-        console.log('=== ELAINA FBX DEBUG ===');
-        let meshIdx = 0;
+        // ===== APPLY TEXTURES BY MESH NAME (not material name!) =====
+        // From debug we know:
+        // Mesh "Elaina_Clothes001" → materials: Clothes, Clothes Outline
+        // Mesh "Elaina001" → materials: Face Body, Outline, Eye
+        // Mesh "Hair001" → materials: Hair, Hair Outline
 
-        // ===== APPLY TEXTURES =====
         fbx.traverse((child: any) => {
           if (!child.isMesh) return;
-          meshIdx++;
 
+          const meshName = (child.name || '').toLowerCase();
           const srcMats = Array.isArray(child.material) ? child.material : [child.material];
+
+          // Determine which texture this MESH should use
+          let meshTex: any;
+          if (meshName.includes('hair')) {
+            meshTex = texHair;
+          } else if (meshName.includes('cloth') || meshName.includes('elaina_cloth')) {
+            meshTex = texClothes;
+          } else {
+            meshTex = texFace; // Elaina001 = face/body/eye
+          }
+
           const newMats: any[] = [];
 
-          srcMats.forEach((srcMat: any, matIdx: number) => {
-            const name = (srcMat.name || '').toLowerCase();
-            const meshName = (child.name || '').toLowerCase();
-            console.log(`Mesh[${meshIdx}] "${child.name}" → Material[${matIdx}] "${srcMat.name}"`);
+          srcMats.forEach((srcMat: any, idx: number) => {
+            const matName = (srcMat.name || '').toLowerCase();
 
-            // Determine texture and settings based on material name
-            let tex: any | null = null;
-            let matColor = 0xffffff;
-            let emissive = 0x000000;
-            let emissiveIntensity = 0;
-            let isOutline = false;
-
-            if (name.includes('hair') && !name.includes('outline')) {
-              tex = texHair;
-              matColor = 0xfff5ee;
-            } else if (name.includes('cloth') || name.includes('clothes') || name.includes('elaina')) {
-              tex = texClothes;
-            } else if (name.includes('face') || name.includes('body')) {
-              tex = texFace;
-              emissive = 0x221111;
-              emissiveIntensity = 0.3; // face slightly emissive so never dark
-            } else if (name.includes('eye')) {
-              tex = texEye;
-            } else if (name.includes('outline')) {
-              isOutline = true;
-            } else {
-              // Unknown material — try to guess from mesh name
-              const mn = meshName;
-              if (mn.includes('hair')) tex = texHair;
-              else if (mn.includes('cloth') || mn.includes('elaina')) tex = texClothes;
-              else tex = texFace;
-            }
-
-            if (isOutline) {
+            // Outline materials — dark transparent
+            if (matName.includes('outline')) {
               newMats.push(new THREE.MeshBasicMaterial({
-                color: 0x2a1040,
+                color: 0x1a0a2e,
                 transparent: true,
-                opacity: 0.4,
+                opacity: 0.45,
                 side: THREE.BackSide,
                 depthWrite: false,
               }));
               return;
             }
 
-            // Build material
-            if (tex) {
-              // Use MeshPhongMaterial — more compatible with FBX textures
+            // Eye material — on the Elaina001 mesh
+            if (matName.includes('eye') && meshName.includes('elaina') && !meshName.includes('cloth')) {
               newMats.push(new THREE.MeshPhongMaterial({
-                map: tex,
-                color: matColor,
-                emissive: emissive,
-                emissiveIntensity: emissiveIntensity,
-                specular: 0x222222,
-                shininess: 15,
+                map: texEye,
+                color: 0xffffff,
+                specular: 0x444444,
+                shininess: 30,
                 side: THREE.DoubleSide,
               }));
-            } else {
-              // Fallback — bright flat material
-              newMats.push(new THREE.MeshPhongMaterial({
-                color: 0xffccdd,
-                emissive: 0x110510,
-                emissiveIntensity: 0.2,
-                side: THREE.DoubleSide,
-              }));
+              return;
             }
+
+            // Face Body material — special handling (has vertex colors)
+            if (matName.includes('face') || matName.includes('body')) {
+              const hasVertexColors = !!child.geometry?.attributes?.color;
+              newMats.push(new THREE.MeshPhongMaterial({
+                map: texFace,
+                color: 0xffffff,
+                // If geometry has vertex colors, use them
+                vertexColors: hasVertexColors,
+                emissive: 0x110808,
+                emissiveIntensity: 0.3,
+                specular: 0x222222,
+                shininess: 10,
+                side: THREE.DoubleSide,
+              }));
+              return;
+            }
+
+            // Hair material
+            if (matName.includes('hair')) {
+              newMats.push(new THREE.MeshPhongMaterial({
+                map: texHair,
+                color: 0xffffff,
+                specular: 0x333333,
+                shininess: 20,
+                side: THREE.DoubleSide,
+              }));
+              return;
+            }
+
+            // Clothes material
+            if (matName.includes('cloth')) {
+              newMats.push(new THREE.MeshPhongMaterial({
+                map: texClothes,
+                color: 0xffffff,
+                specular: 0x222222,
+                shininess: 10,
+                side: THREE.DoubleSide,
+              }));
+              return;
+            }
+
+            // Fallback — use mesh texture
+            newMats.push(new THREE.MeshPhongMaterial({
+              map: meshTex,
+              color: 0xffffff,
+              side: THREE.DoubleSide,
+            }));
           });
 
           child.material = newMats.length === 1 ? newMats[0] : newMats;
           child.geometry.computeVertexNormals();
         });
 
-        // ===== DISCOVER BONES =====
-        console.log('=== BONE DISCOVERY ===');
-        const allBones: { name: string; obj: any }[] = [];
-        fbx.traverse((child: any) => {
-          if (child.isBone || child.type === 'Bone') {
-            allBones.push({ name: child.name, obj: child });
-            console.log(`Bone: "${child.name}"`);
-          }
-        });
-
-        // Also check non-Bone objects that might be skeleton parts
-        fbx.traverse((child: any) => {
-          const n = (child.name || '').toLowerCase();
-          if (n.includes('head') || n.includes('neck')) {
-            headBone = child;
-            console.log(`HEAD BONE FOUND: "${child.name}" type=${child.type}`);
-          }
-        });
-
-        // If no head bone found, try by hierarchy position
-        if (!headBone && allBones.length > 0) {
-          // Try to find by common patterns
-          for (const b of allBones) {
-            const n = b.name.toLowerCase();
-            if (n === 'head' || n.includes('head') || n === 'neck' || n.includes('neck') ||
-                n === 'head.fbx' || n.includes('head.bone')) {
-              headBone = b.obj;
-              console.log(`HEAD BONE MATCHED: "${b.name}"`);
-              break;
-            }
-          }
-        }
-
-        console.log(`Total bones: ${allBones.length}, Head bone: ${headBone?.name || 'NOT FOUND'}`);
-
         scene.add(fbx);
         if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
       }, undefined, (err) => {
-        if (cancelled) return;
-        console.error('FBX load error:', err);
+        if (!cancelled) console.error('FBX load error:', err);
       });
 
       // ===== MOUSE =====
@@ -235,54 +212,27 @@ export default function Elaina3D() {
       };
       container.addEventListener('mousemove', onMouseMove);
 
-      // ===== ANIMATION =====
+      // ===== ANIMATION — Procedural body movement (no skeleton needed) =====
       let time = 0;
+      let baseY = 0;
+      let baseSet = false;
+
       function animate() {
         animFrameId = requestAnimationFrame(animate);
         time += 0.016;
 
         if (model) {
-          // Body follows mouse
-          const targetRotY = mouseX * 0.3;
-          model.rotation.y += (targetRotY - model.rotation.y) * 0.04;
+          if (!baseSet) { baseY = model.position.y; baseSet = true; }
+
+          // Body rotation follows mouse
+          model.rotation.y += (mouseX * 0.3 - model.rotation.y) * 0.04;
 
           // Breathing float
-          const baseY = model.userData.baseY ?? model.position.y;
-          if (!model.userData.baseY) model.userData.baseY = model.position.y;
           model.position.y = baseY + Math.sin(time * 1.2) * 0.08;
 
           // Gentle sway
-          model.rotation.x = Math.sin(time * 0.5) * 0.015;
-          model.rotation.z = Math.sin(time * 0.7) * 0.008;
-
-          // Head tracking
-          if (headBone) {
-            const targetHeadY = mouseX * 0.4;
-            const targetHeadX = mouseY * -0.2;
-            headBone.rotation.y += (targetHeadY - headBone.rotation.y) * 0.06;
-            headBone.rotation.x += (targetHeadX - headBone.rotation.x) * 0.06;
-          }
-
-          // Procedural arm sway — find arm bones and animate them
-          model.traverse((child: any) => {
-            if (!child.isBone && child.type !== 'Bone') return;
-            const n = (child.name || '').toLowerCase();
-            // Right arm gentle sway
-            if ((n.includes('right') || n.includes('.r')) && (n.includes('arm') || n.includes('shoulder') || n.includes('clavic'))) {
-              child.rotation.z = Math.sin(time * 0.8 + 0.5) * 0.05;
-              child.rotation.x = Math.sin(time * 0.6 + 1.0) * 0.03;
-            }
-            // Left arm gentle sway
-            if ((n.includes('left') || n.includes('.l')) && (n.includes('arm') || n.includes('shoulder') || n.includes('clavic'))) {
-              child.rotation.z = Math.sin(time * 0.8 + 2.5) * -0.05;
-              child.rotation.x = Math.sin(time * 0.6 + 3.0) * 0.03;
-            }
-            // Spine/chest subtle sway
-            if (n.includes('spine') || n.includes('chest') || n.includes('torso') || n.includes('body')) {
-              child.rotation.x = Math.sin(time * 0.5) * 0.02;
-              child.rotation.z = Math.sin(time * 0.3) * 0.01;
-            }
-          });
+          model.rotation.x = Math.sin(time * 0.5) * 0.012;
+          model.rotation.z = Math.sin(time * 0.7) * 0.006;
         }
 
         renderer.render(scene, camera);
