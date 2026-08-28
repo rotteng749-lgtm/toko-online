@@ -156,7 +156,6 @@ export default function CheckoutPage() {
       </div>
 
       <div id="toast-container" className="toast-container" />
-      <script src="/app.js" async />
     </div>
   );
 }

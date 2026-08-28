@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import ClientEffects from '../components/ClientEffects';
 
 export const metadata: Metadata = {
   title: 'Toko Online ✨ — Belanja Mudah via WhatsApp',
@@ -25,10 +26,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://models.elaina.fbx" />
       </head>
-      <body className="page-enter">
+      <body suppressHydrationWarning>
         <div className="ambient-bg" />
+        <ClientEffects />
         {children}
       </body>
     </html>
