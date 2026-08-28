@@ -23,11 +23,11 @@ export default function Elaina3D() {
       const scene = new THREE.Scene();
 
       // Camera
-      const camera = new THREE.PerspectiveCamera(25, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(0, 8, 18);
-      camera.lookAt(0, 4, 0);
+      const camera = new THREE.PerspectiveCamera(22, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(0, 7, 16);
+      camera.lookAt(0, 4.5, 0);
 
-      // Renderer
+      // Renderer — anime/toon style
       const renderer = new THREE.WebGLRenderer({
         alpha: true,
         antialias: true,
@@ -38,50 +38,78 @@ export default function Elaina3D() {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.2;
+      renderer.toneMappingExposure = 1.4;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
       container.appendChild(renderer.domElement);
 
-      // Lights — anime-style soft lighting
-      const ambientLight = new THREE.AmbientLight(0xb0a0ff, 0.8);
+      // ===== LIGHTING — Bright anime-style lighting =====
+      // Strong ambient so model is never dark
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
       scene.add(ambientLight);
 
-      const mainLight = new THREE.DirectionalLight(0xffd4e8, 1.5);
-      mainLight.position.set(5, 12, 8);
-      mainLight.castShadow = true;
-      mainLight.shadow.mapSize.width = 1024;
-      mainLight.shadow.mapSize.height = 1024;
-      scene.add(mainLight);
+      // Main key light — warm pinkish
+      const keyLight = new THREE.DirectionalLight(0xfff0f5, 2.0);
+      keyLight.position.set(3, 10, 8);
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.width = 1024;
+      keyLight.shadow.mapSize.height = 1024;
+      scene.add(keyLight);
 
-      const rimLight = new THREE.DirectionalLight(0xa0d4ff, 0.6);
-      rimLight.position.set(-5, 8, -5);
-      scene.add(rimLight);
-
-      const fillLight = new THREE.PointLight(0xd4a0ff, 0.5, 30);
-      fillLight.position.set(-3, 5, 5);
+      // Fill light — cool blue from the side
+      const fillLight = new THREE.DirectionalLight(0xd4e4ff, 1.0);
+      fillLight.position.set(-5, 6, 4);
       scene.add(fillLight);
 
-      // Pink accent light from below
-      const accentLight = new THREE.PointLight(0xff69b4, 0.3, 20);
-      accentLight.position.set(0, -2, 3);
+      // Rim / back light — purple edge glow
+      const rimLight = new THREE.DirectionalLight(0xc8a0ff, 0.8);
+      rimLight.position.set(0, 5, -8);
+      scene.add(rimLight);
+
+      // Pink accent from below/front
+      const accentLight = new THREE.PointLight(0xffb7d5, 0.6, 25);
+      accentLight.position.set(0, 0, 6);
       scene.add(accentLight);
 
-      // Load FBX model
+      // Top light for hair highlight
+      const topLight = new THREE.PointLight(0xffffff, 0.4, 20);
+      topLight.position.set(0, 12, 0);
+      scene.add(topLight);
+
+      // ===== Load FBX model =====
       const loader = new FBXLoader();
       let model: any = null;
+      let headBone: any = null;
 
-      // Create a loading indicator
+      // Loading indicator
       const loadingDiv = document.createElement('div');
-      loadingDiv.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#c8b8e8;font-size:14px;font-family:Inter,sans-serif;';
+      loadingDiv.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#c8b8e8;font-size:14px;font-family:Inter,sans-serif;z-index:2;';
       loadingDiv.innerHTML = `
-        <div style="width:48px;height:48px;border:3px solid rgba(200,184,232,0.2);border-top-color:#c8b8e8;border-radius:50%;animation:spin 1s linear infinite;"></div>
-        <span>Loading Elaina 3D...</span>
+        <div style="width:48px;height:48px;border:3px solid rgba(200,184,232,0.2);border-top-color:#ffb7d5;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+        <span style="color:#ffb7d5;">Loading Elaina 3D...</span>
       `;
       container.appendChild(loadingDiv);
 
-      // Add spin animation
       const style = document.createElement('style');
       style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
       document.head.appendChild(style);
+
+      // Texture loading
+      const textureLoader = new THREE.TextureLoader();
+      const texDir = '/models/elaina/';
+
+      function loadTexture(name: string) {
+        const tex = textureLoader.load(texDir + name);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false;
+        return tex;
+      }
+
+      const textures = {
+        hair: loadTexture('Hair_Base_Color.png'),
+        clothes: loadTexture('Clothes.png'),
+        face: loadTexture('Face_Body_Base_Color.png'),
+        eye: loadTexture('Eye.png'),
+      };
 
       loader.load(
         '/models/elaina/Elaina.fbx',
@@ -94,104 +122,122 @@ export default function Elaina3D() {
           const size = box.getSize(new THREE.Vector3());
           const center = box.getCenter(new THREE.Vector3());
           const maxDim = Math.max(size.x, size.y, size.z);
-          const scale = 10 / maxDim;
+          const scale = 9 / maxDim;
           fbx.scale.setScalar(scale);
           fbx.position.sub(center.multiplyScalar(scale));
-          fbx.position.y -= (box.min.y * scale);
+          fbx.position.y -= box.min.y * scale;
 
-          // Apply textures to materials
-          const textureLoader = new THREE.TextureLoader();
-          const texDir = '/models/elaina/';
-
+          // ===== APPLY TEXTURES BY MATERIAL NAME =====
           fbx.traverse((child: any) => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
+            if (!child.isMesh) return;
 
-              if (child.material) {
-                const mat = Array.isArray(child.material) ? child.material : [child.material];
-                mat.forEach((m: any) => {
-                  m.wireframe = false;
-                  // Try to identify material by name
-                  const name = (m.name || '').toLowerCase();
-                  if (name.includes('hair') || name.includes('hijab') || name.includes('hodie')) {
-                    const tex = textureLoader.load(texDir + 'Hair_Base_Color.png');
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    m.map = tex;
-                  } else if (name.includes('cloth') || name.includes('body') || name.includes('outfit') || name.includes('wear')) {
-                    const tex = textureLoader.load(texDir + 'Clothes.png');
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    m.map = tex;
-                  } else if (name.includes('face') || name.includes('body') || name.includes('skin')) {
-                    const tex = textureLoader.load(texDir + 'Face_Body_Base_Color.png');
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    m.map = tex;
-                  } else if (name.includes('eye')) {
-                    const tex = textureLoader.load(texDir + 'Eye.png');
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    m.map = tex;
-                  } else {
-                    // Default: try clothes texture
-                    const tex = textureLoader.load(texDir + 'Clothes.png');
-                    tex.colorSpace = THREE.SRGBColorSpace;
-                    m.map = tex;
-                  }
-                  m.needsUpdate = true;
-                });
+            child.castShadow = true;
+            child.receiveShadow = true;
+
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+
+            mats.forEach((m: any) => {
+              const name = (m.name || '').toLowerCase();
+
+              // Match material name to texture
+              if (name.includes('hair')) {
+                m.map = textures.hair;
+                m.color.set(0xffffff);
+              } else if (name.includes('cloth') || name.includes('clothes') || name.includes('elaina')) {
+                m.map = textures.clothes;
+                m.color.set(0xffffff);
+              } else if (name.includes('face') || name.includes('body')) {
+                m.map = textures.face;
+                m.color.set(0xffffff);
+              } else if (name.includes('eye')) {
+                m.map = textures.eye;
+                m.color.set(0xffffff);
+              } else {
+                // Outline materials — keep dark
+                if (name.includes('outline')) {
+                  m.color.set(0x1a0a2e);
+                  m.transparent = true;
+                  m.opacity = 0.7;
+                } else {
+                  // Default — apply face texture
+                  m.map = textures.face;
+                  m.color.set(0xffffff);
+                }
+              }
+
+              // Ensure materials render properly
+              m.side = THREE.DoubleSide;
+              m.needsUpdate = true;
+            });
+          });
+
+          // ===== FIND HEAD BONE FOR TRACKING =====
+          fbx.traverse((child: any) => {
+            if (child.isBone) {
+              const boneName = child.name.toLowerCase();
+              if (boneName.includes('head') || boneName.includes('neck')) {
+                headBone = child;
               }
             }
           });
 
           scene.add(fbx);
 
-          // Remove loading indicator
+          // Remove loading
           if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
         },
         undefined,
         (err) => {
           if (cancelled) return;
           console.error('FBX load error:', err);
-          loadingDiv.innerHTML = `
-            <div style="font-size:48px;">🧹</div>
-            <span style="color:#e8a0c8;">Elaina — The Mysterious Witch</span>
-            <span style="font-size:12px;color:rgba(200,184,232,0.5);">3D model loading...</span>
-          `;
+          loadingDiv.innerHTML = `<span style="color:#fb7185;">Failed to load model</span>`;
         }
       );
 
-      // Mouse interaction — rotate model
+      // ===== MOUSE INTERACTION =====
       let mouseX = 0;
-      let targetRotY = 0;
+      let mouseY = 0;
 
       const onMouseMove = (e: MouseEvent) => {
         const rect = container.getBoundingClientRect();
         mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        targetRotY = mouseX * 0.5;
+        mouseY = ((e.clientY - rect.top) / rect.height) * 2 - 1;
       };
       container.addEventListener('mousemove', onMouseMove);
 
-      // Idle floating animation
+      // ===== ANIMATION LOOP =====
       let time = 0;
 
-      // Animation loop
       function animate() {
         animFrameId = requestAnimationFrame(animate);
-        time += 0.01;
+        time += 0.016;
 
         if (model) {
-          // Smooth rotation toward mouse
-          model.rotation.y += (targetRotY - model.rotation.y) * 0.03;
+          // Smooth body rotation following mouse
+          const targetRotY = mouseX * 0.3;
+          model.rotation.y += (targetRotY - model.rotation.y) * 0.04;
 
-          // Subtle idle breathing/floating
-          model.position.y += Math.sin(time * 1.5) * 0.003;
-          model.rotation.z = Math.sin(time * 0.8) * 0.01;
+          // Idle breathing — gentle floating
+          model.position.y += Math.sin(time * 1.2) * 0.002;
+          model.rotation.z = Math.sin(time * 0.7) * 0.008;
+
+          // Head tracking — rotate head bone toward mouse
+          if (headBone) {
+            const headRotX = mouseY * -0.25;  // look up/down
+            const headRotY = mouseX * 0.35;   // look left/right
+            headBone.rotation.x += (headRotX - headBone.rotation.x) * 0.06;
+            headBone.rotation.y += (headRotY - headBone.rotation.y) * 0.06;
+          }
+
+          // Gentle swaying animation
+          model.rotation.x = Math.sin(time * 0.5) * 0.015;
         }
 
         renderer.render(scene, camera);
       }
       animate();
 
-      // Resize handler
+      // Resize
       const onResize = () => {
         if (!container.clientWidth) return;
         camera.aspect = container.clientWidth / container.clientHeight;
@@ -200,6 +246,7 @@ export default function Elaina3D() {
       };
       window.addEventListener('resize', onResize);
 
+      // Cleanup
       cleanupRef.current = () => {
         cancelled = true;
         cancelAnimationFrame(animFrameId);
