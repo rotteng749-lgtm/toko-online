@@ -72,8 +72,8 @@ export default function Elaina3D() {
         fbx.scale.setScalar(scale);
         fbx.position.sub(center.multiplyScalar(scale));
         fbx.position.y -= box.min.y * scale;
-        // Shift model DOWN so face is centered (hat is on top)
-        fbx.position.y -= 1.5;
+        // Shift model UP so face (below hat) comes into camera view
+        fbx.position.y += 1.5;
 
         // Check for skeleton
         fbx.traverse((child: any) => {
