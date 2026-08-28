@@ -19,8 +19,8 @@ export default function Elaina3D() {
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(22, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(0, 5.5, 13);
-      camera.lookAt(0, 4.5, 0);
+      camera.position.set(0, 4.0, 12);
+      camera.lookAt(0, 3.5, 0);
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -73,6 +73,8 @@ export default function Elaina3D() {
         fbx.scale.setScalar(scale);
         fbx.position.sub(center.multiplyScalar(scale));
         fbx.position.y -= box.min.y * scale;
+        // Move model UP so face is centered in viewport
+        fbx.position.y += 2.0;
 
         // Find skeleton + bone map
         fbx.traverse((child: any) => {
@@ -128,22 +130,25 @@ export default function Elaina3D() {
           });
         });
 
-        // ===== FIX BROOCH (HAT) — try multiple directions =====
+        // ===== HIDE BROOCH (HAT) + ALL CHILDREN =====
         const brooch = boneMap['Brooch'] || boneMap['brooch'];
         if (brooch) {
-          // The Brooch bone might be in local space
-          // Try moving it along the bone's local Y axis (which might be "up" for the hat)
-          // Store original
-          brooch.userData.origPos = brooch.position.clone();
-          brooch.userData.origRot = brooch.rotation.clone();
-
-          // Move hat UP in world space by modifying the bone's position
-          // FBX bone Y-up might be different from what we expect
-          // Try: move along bone's local UP direction
-          const upDir = new THREE.Vector3(0, 1, 0);
-          upDir.applyQuaternion(brooch.quaternion);
-          brooch.position.addScaledVector(upDir, 1.5);
+          // Hide the hat completely
+          brooch.traverse((child: any) => {
+            if (child.isMesh) {
+              child.visible = false;
+            }
+          });
+          // Also hide the brooch bone itself (so its children are hidden too)
+          brooch.visible = false;
         }
+
+        // Also find and hide any mesh with 'brooch' in name
+        fbx.traverse((child: any) => {
+          if (child.isMesh && (child.name || '').toLowerCase().includes('brooch')) {
+            child.visible = false;
+          }
+        });
 
         scene.add(fbx);
         if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
