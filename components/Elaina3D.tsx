@@ -18,6 +18,7 @@ export default function Elaina3D() {
       if (cancelled) return;
 
       const scene = new THREE.Scene();
+      // Camera focused on FACE area (below hat)
       const camera = new THREE.PerspectiveCamera(22, container.clientWidth / container.clientHeight, 0.1, 1000);
       camera.position.set(0, 4.0, 12);
       camera.lookAt(0, 3.5, 0);
@@ -49,7 +50,6 @@ export default function Elaina3D() {
       const texBody = loadTex('body.png');
       const texDress = loadTex('Dress.png');
       const texCoat = loadTex('Coat.png');
-      const texBrooch = loadTex('brooch_3.png');
       const texBroom = loadTex('broom.png');
 
       // Load FBX
@@ -57,14 +57,11 @@ export default function Elaina3D() {
       let model: any = null;
       let boneMap: Record<string, any> = {};
       let hasSkeleton = false;
-      // Track eye-related meshes for blinking
-      let eyeMeshes: any[] = [];
 
       loader.load('/models/elaina-vr/Elaina%20sk.fbx', (fbx) => {
         if (cancelled) return;
         model = fbx;
 
-        // Scale and center
         const box = new THREE.Box3().setFromObject(fbx);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
@@ -73,10 +70,10 @@ export default function Elaina3D() {
         fbx.scale.setScalar(scale);
         fbx.position.sub(center.multiplyScalar(scale));
         fbx.position.y -= box.min.y * scale;
-        // Move model UP so face is centered in viewport
+        // Move model UP so face is centered
         fbx.position.y += 2.0;
 
-        // Find skeleton + bone map
+        // Find skeleton
         fbx.traverse((child: any) => {
           if (child.skeleton) {
             hasSkeleton = true;
@@ -87,16 +84,27 @@ export default function Elaina3D() {
           }
         });
 
-        // Apply textures + find eye meshes
+        // ===== ULTRA-AGGRESSIVE HAT/BROOCH/BROOM HIDE =====
+        // Hide by bone name
+        const hideNames = ['brooch', 'broom', 'hat', 'witch hat', 'accessory'];
         fbx.traverse((child: any) => {
-          if (!child.isMesh) return;
+          const n = (child.name || '').toLowerCase();
+          if (hideNames.some(h => n.includes(h))) {
+            child.visible = false;
+          }
+        });
+        // Also hide by Brooch bone children
+        const broochBone = boneMap['Brooch'] || boneMap['brooch'];
+        if (broochBone) {
+          broochBone.visible = false;
+          broochBone.traverse((c: any) => { c.visible = false; });
+        }
+
+        // Apply textures
+        fbx.traverse((child: any) => {
+          if (!child.isMesh || !child.visible) return;
           const meshName = (child.name || '').toLowerCase();
           const srcMats = Array.isArray(child.material) ? child.material : [child.material];
-
-          // Track eye meshes for blinking
-          if (meshName.includes('eye') || meshName.includes("'eye")) {
-            eyeMeshes.push(child);
-          }
 
           child.material = srcMats.map((m: any) => {
             const matName = (m.name || '').toLowerCase();
@@ -108,10 +116,11 @@ export default function Elaina3D() {
               });
             }
 
+            // Skip eye material (face texture has eyes)
             if (matName.includes('eye')) {
-              // Eye mesh — keep visible for blinking
               return new THREE.MeshBasicMaterial({
                 color: 0xffffff, side: THREE.DoubleSide,
+                transparent: true, opacity: 0.0, depthWrite: false,
               });
             }
 
@@ -120,7 +129,6 @@ export default function Elaina3D() {
             else if (meshName.includes('face') || matName.includes('face')) tex = texFace;
             else if (meshName.includes('dress') || matName.includes('dress')) tex = texDress;
             else if (meshName.includes('coat') || matName.includes('coat')) tex = texCoat;
-            else if (meshName.includes('brooch') || matName.includes('brooch')) tex = texBrooch;
             else if (meshName.includes('broom') || matName.includes('broom')) tex = texBroom;
             else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
 
@@ -128,26 +136,6 @@ export default function Elaina3D() {
               map: tex, color: 0xffffff, side: THREE.DoubleSide,
             });
           });
-        });
-
-        // ===== HIDE BROOCH (HAT) + ALL CHILDREN =====
-        const brooch = boneMap['Brooch'] || boneMap['brooch'];
-        if (brooch) {
-          // Hide the hat completely
-          brooch.traverse((child: any) => {
-            if (child.isMesh) {
-              child.visible = false;
-            }
-          });
-          // Also hide the brooch bone itself (so its children are hidden too)
-          brooch.visible = false;
-        }
-
-        // Also find and hide any mesh with 'brooch' in name
-        fbx.traverse((child: any) => {
-          if (child.isMesh && (child.name || '').toLowerCase().includes('brooch')) {
-            child.visible = false;
-          }
         });
 
         scene.add(fbx);
@@ -164,58 +152,6 @@ export default function Elaina3D() {
         mouseY = ((e.clientY - rect.top) / rect.height) * 2 - 1;
       };
       container.addEventListener('mousemove', onMouseMove);
-
-      // ===== EYE BLINK SYSTEM =====
-      let blinkTimer = 0;
-      let blinkInterval = 3 + Math.random() * 2; // 3-5 seconds between blinks
-      let isBlinking = false;
-      let blinkPhase = 0; // 0=open, 1=closing, 2=closed, 3=opening
-      let blinkSpeed = 12; // speed of blink animation
-
-      function updateBlink(dt: number) {
-        blinkTimer += dt;
-
-        if (!isBlinking && blinkTimer >= blinkInterval) {
-          isBlinking = true;
-          blinkPhase = 1;
-          blinkTimer = 0;
-          blinkInterval = 2 + Math.random() * 3; // next blink in 2-5s
-        }
-
-        if (isBlinking) {
-          blinkPhase += dt * blinkSpeed;
-
-          if (blinkPhase >= 4) {
-            // Blink complete
-            blinkPhase = 0;
-            isBlinking = false;
-            // Reset eye mesh scale
-            eyeMeshes.forEach(m => {
-              m.scale.y = 1;
-            });
-          } else {
-            // Apply blink scale to eye meshes
-            let scaleY = 1;
-            if (blinkPhase < 1) {
-              // Closing
-              scaleY = 1 - blinkPhase;
-            } else if (blinkPhase < 2) {
-              // Closed
-              scaleY = 0.05;
-            } else if (blinkPhase < 3) {
-              // Opening
-              scaleY = blinkPhase - 2;
-            } else {
-              // Almost open
-              scaleY = 1 - (blinkPhase - 3);
-            }
-            scaleY = Math.max(0.05, Math.min(1, scaleY));
-            eyeMeshes.forEach(m => {
-              m.scale.y = scaleY;
-            });
-          }
-        }
-      }
 
       // Animation
       let time = 0;
@@ -253,18 +189,14 @@ export default function Elaina3D() {
           model.rotation.x = Math.sin(time * 0.5) * 0.012;
           model.rotation.z = Math.sin(time * 0.7) * 0.006;
 
-          // Eye blink
-          updateBlink(dt);
-
           if (hasSkeleton) {
-            // Head tracking
+            // Head tracking (face only!)
             const head = findBone(['head']);
             if (head) {
               head.rotation.y += (mouseX * 0.5 - head.rotation.y) * 0.06;
               head.rotation.x += (mouseY * -0.3 - head.rotation.x) * 0.06;
             }
 
-            // Neck
             const neck = findBone(['neck']);
             if (neck) neck.rotation.y += (mouseX * 0.2 - neck.rotation.y) * 0.04;
 
@@ -277,7 +209,7 @@ export default function Elaina3D() {
               chest.rotation.z = Math.sin(time * 0.8) * 0.01;
             }
 
-            // Arms — kawaii raised pose
+            // Arms — gentle idle
             const upperArmL = findBone(['upper_arm_l']);
             const upperArmR = findBone(['upper_arm_r']);
             if (upperArmL) {
@@ -289,21 +221,6 @@ export default function Elaina3D() {
               upperArmR.rotation.x = -0.15 + Math.sin(time * 0.4 + 2.5) * 0.04;
             }
 
-            const shoulderL = findBone(['shoulder_l']);
-            const shoulderR = findBone(['shoulder_r']);
-            if (shoulderL) shoulderL.rotation.z = Math.sin(time * 0.5) * 0.02;
-            if (shoulderR) shoulderR.rotation.z = Math.sin(time * 0.5 + Math.PI) * 0.02;
-
-            // Hips
-            const hips = findBone(['hip']);
-            if (hips) hips.rotation.z = Math.sin(time * 0.4) * 0.015;
-
-            // Legs
-            const upperLegL = findBone(['upper_leg_l']);
-            const upperLegR = findBone(['upper_leg_r']);
-            if (upperLegL) upperLegL.rotation.x = Math.sin(time * 0.3) * 0.02;
-            if (upperLegR) upperLegR.rotation.x = Math.sin(time * 0.3 + Math.PI) * 0.02;
-
             // Hair sway
             ['hairback_01', 'hairback_02', 'hairback_03', 'hairfront_01', 'hairfront_02'].forEach((name, i) => {
               const bone = findBone([name]);
@@ -313,16 +230,10 @@ export default function Elaina3D() {
               }
             });
 
-            // Coat sway
-            ['coat_l_front', 'coat_r_front', 'coat_l_back_01', 'coat_r_back_01'].forEach((name, i) => {
+            // Coat/Skirt sway
+            ['coat_l_front', 'coat_r_front', 'skirt_l_front', 'skirt_r_front'].forEach((name, i) => {
               const bone = findBone([name]);
               if (bone) bone.rotation.z = Math.sin(time * 0.5 + i * 0.8) * 0.04;
-            });
-
-            // Skirt sway
-            ['skirt_l_front', 'skirt_r_front', 'skirt_l_back', 'skirt_r_back'].forEach((name, i) => {
-              const bone = findBone([name]);
-              if (bone) bone.rotation.z = Math.sin(time * 0.5 + i * 0.6) * 0.03;
             });
           }
         }
