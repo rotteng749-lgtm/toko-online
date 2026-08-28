@@ -247,6 +247,24 @@ img { max-width: 100%; display: block; }
 }
 .hero-3d-label::before { content: '✨ '; }
 
+/* ===== HERO SPARKLE PARTICLES ===== */
+.hero-sparkles {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+}
+.hero-sparkle {
+  position: absolute; bottom: 10%;
+  color: var(--sakura);
+  text-shadow: 0 0 8px rgba(255,183,213,0.8), 0 0 16px rgba(192,132,252,0.5);
+  animation: sparkle-float 3s ease-in-out infinite;
+  opacity: 0;
+}
+@keyframes sparkle-float {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  20% { opacity: 0.8; transform: translateY(-30px) scale(1); }
+  80% { opacity: 0.6; transform: translateY(-120px) scale(0.8); }
+  100% { opacity: 0; transform: translateY(-160px) scale(0.3); }
+}
+
 /* Floating shapes — sakura themed */
 .hero-shapes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .hero-shape {

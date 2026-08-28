@@ -118,7 +118,18 @@ export default function HomePage() {
           <div className="hero-3d-wrapper animate-fade-up animate-delay-1">
             <div className="hero-3d-glow" />
             <Elaina3D />
-            <div className="hero-3d-label">Elaina — The Wandering Witch</div>
+            <div className="hero-3d-label">Elaina — The Wandering Witch ✨</div>
+            {/* Floating sparkle particles */}
+            <div className="hero-sparkles">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="hero-sparkle" style={{
+                  left: `${15 + Math.random() * 70}%`,
+                  animationDelay: `${i * 0.7}s`,
+                  animationDuration: `${2 + Math.random() * 2}s`,
+                  fontSize: `${8 + Math.random() * 12}px`,
+                }}>✦</div>
+              ))}
+            </div>
           </div>
 
           <h1 className="animate-fade-up animate-delay-2">
