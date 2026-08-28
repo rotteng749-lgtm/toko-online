@@ -113,7 +113,13 @@ export default function Elaina3D() {
             else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
             else if (meshName.includes('brooch') || matName.includes('brooch')) tex = texBrooch;
             else if (meshName.includes('broom') || matName.includes('broom')) tex = texBroom;
-            else if (matName.includes('eye')) tex = texFace;
+            else if (matName.includes('eye')) {
+              // Eye material — skip texture, face texture already has eyes painted
+              return new THREE.MeshBasicMaterial({
+                color: 0xffffff, side: THREE.DoubleSide,
+                transparent: true, opacity: 0.0, depthWrite: false,
+              });
+            }
 
             return new THREE.MeshBasicMaterial({
               map: tex, color: 0xffffff, side: THREE.DoubleSide,
