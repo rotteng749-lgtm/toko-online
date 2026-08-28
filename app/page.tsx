@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const Elaina3D = dynamic(() => import('../components/Elaina3D'), { ssr: false });
 
 interface Product {
   id: number; name: string; slug: string; price: number; sale_price: number;
@@ -25,6 +28,7 @@ export default function HomePage() {
     if (saved) setCart(JSON.parse(saved));
     fetch('/api/products?limit=100').then(r => r.json()).then(d => { if (d.ok) setProducts(d.products); });
     fetch('/api/categories').then(r => r.json()).then(d => { if (d.ok) setCategories(d.categories); });
+    fetch('/api/admin/settings').then(r => r.json()).then(d => { if (d.ok && d.settings?.store_name) setStoreName(d.settings.store_name); });
 
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -50,7 +54,7 @@ export default function HomePage() {
       if (existing) return prev.map(i => i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, { product, qty: 1 }];
     });
-    (window as any).showToast?.(`${product.name} ditambahkan ke keranjang`, 'success');
+    (window as any).showToast?.(`${product.name} ditambahkan ke keranjang ✨`, 'success');
   };
 
   const updateQty = (productId: number, delta: number) => {
@@ -74,6 +78,9 @@ export default function HomePage() {
 
   return (
     <div>
+      {/* Scroll Progress */}
+      <div className="scroll-progress" id="scroll-progress" />
+
       {/* Header */}
       <header className={`header${scrolled ? ' scrolled' : ''}`}>
         <div className="header-inner">
@@ -96,14 +103,29 @@ export default function HomePage() {
       </header>
 
       <div className="container">
-        {/* Hero */}
+        {/* Hero with 3D Elaina + floating shapes */}
         <div className="hero">
+          <div className="hero-shapes">
+            <div className="hero-shape" />
+            <div className="hero-shape" />
+            <div className="hero-shape" />
+            <div className="hero-shape" />
+          </div>
+
           <div className="hero-badge animate-fade-up">✨ Belanja Online Terpercaya</div>
-          <h1 className="animate-fade-up animate-delay-1">
+
+          {/* 3D Elaina Model */}
+          <div className="hero-3d-wrapper animate-fade-up animate-delay-1">
+            <div className="hero-3d-glow" />
+            <Elaina3D />
+            <div className="hero-3d-label">Elaina — The Wandering Witch</div>
+          </div>
+
+          <h1 className="animate-fade-up animate-delay-2">
             Belanja <span className="gradient-text">Mudah</span>,<br />
             Kirim <span className="gradient-text-2">via WhatsApp</span>
           </h1>
-          <p className="animate-fade-up animate-delay-2">
+          <p className="animate-fade-up animate-delay-3">
             Temukan produk terbaikmu dan pesan langsung lewat WhatsApp. Cepat, praktis, tanpa ribet.
           </p>
           <div className="hero-actions animate-fade-up animate-delay-3">
@@ -136,7 +158,7 @@ export default function HomePage() {
 
         {/* Categories */}
         <div id="products" className="section-bar animate-fade-up">
-          <h2 className="section-bar-title">Produk Kami</h2>
+          <h2 className="section-bar-title">Produk Kami ✨</h2>
         </div>
         <div className="categories animate-fade-up animate-delay-1">
           <button className={`cat-pill${activeCat === '' ? ' active' : ''}`} onClick={() => setActiveCat('')}>
@@ -154,13 +176,13 @@ export default function HomePage() {
           <div className="empty-state animate-fade-up">
             <div className="icon">📦</div>
             <h3>Belum ada produk</h3>
-            <p>Produk akan segera tersedia</p>
+            <p>Produk akan segera tersedia~</p>
           </div>
         ) : (
           <div className="product-grid">
-            {products.map((p, idx) => (
+            {products.map((p) => (
               <Link key={p.id} href={`/product/${p.slug}`}>
-                <div className="product-card" style={{ animationDelay: `${idx * 0.05}s` }}>
+                <div className="product-card">
                   {p.sale_price > 0 && (
                     <div className="badge-sale">
                       -{Math.round((1 - p.sale_price / p.price) * 100)}%
@@ -199,7 +221,7 @@ export default function HomePage() {
         <div className="footer-inner">
           <div className="footer-brand">
             <div className="logo" style={{ fontSize: 18 }}>{storeName}</div>
-            <p>Belanja mudah, kirim via WhatsApp.</p>
+            <p>Belanja mudah, kirim via WhatsApp. 🧹✨</p>
           </div>
           <div className="footer-links">
             <Link href="/">🏠 Beranda</Link>
@@ -207,7 +229,7 @@ export default function HomePage() {
             <Link href="/admin">⚡ Admin</Link>
           </div>
           <div className="footer-bottom">
-            © {new Date().getFullYear()} {storeName}. All rights reserved.
+            © {new Date().getFullYear()} {storeName}. Made with ✨ by Elaina~
           </div>
         </div>
       </footer>
@@ -231,8 +253,8 @@ export default function HomePage() {
         {cart.length === 0 ? (
           <div className="cart-empty">
             <div className="empty-icon">🛒</div>
-            <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Keranjang kosong</p>
-            <p style={{ fontSize: 13 }}>Yuk mulai belanja!</p>
+            <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, fontFamily: 'var(--font-kawaii)' }}>Keranjang kosong~</p>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Yuk mulai belanja!</p>
           </div>
         ) : (
           <>

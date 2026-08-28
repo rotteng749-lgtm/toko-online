@@ -12,6 +12,7 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [galleryHover, setGalleryHover] = useState({ x: 50, y: 50 });
 
   useEffect(() => {
     const saved = localStorage.getItem('cart');
@@ -39,6 +40,13 @@ export default function ProductPage() {
   const formatIDR = (n: number) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
   const discount = product?.sale_price && product?.price ? Math.round((1 - product.sale_price / product.price) * 100) : 0;
 
+  const handleGalleryMouseMove = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setGalleryHover({ x, y });
+  };
+
   if (!product) return (
     <div className="page-enter">
       <div className="ambient-bg" />
@@ -53,7 +61,7 @@ export default function ProductPage() {
     <div className="page-enter">
       <div className="ambient-bg" />
 
-      {/* Minimal header */}
+      {/* Header */}
       <header className="header">
         <div className="header-inner">
           <Link href="/" className="logo" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -70,8 +78,16 @@ export default function ProductPage() {
 
       <div className="container">
         <div className="product-detail">
-          {/* Gallery */}
-          <div className="product-gallery animate-fade-up">
+          {/* 3D Gallery */}
+          <div
+            className="product-gallery animate-fade-up"
+            onMouseMove={handleGalleryMouseMove}
+            onMouseLeave={() => setGalleryHover({ x: 50, y: 50 })}
+            style={{
+              '--glare-x': galleryHover.x + '%',
+              '--glare-y': galleryHover.y + '%',
+            } as React.CSSProperties}
+          >
             <img
               src={product.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&h=600&fit=crop'}
               alt={product.name}
@@ -79,6 +95,10 @@ export default function ProductPage() {
             {discount > 0 && (
               <div className="badge-sale" style={{ top: 20, left: 20 }}>-{discount}%</div>
             )}
+            {/* Glare overlay */}
+            <div className="gallery-glare" style={{
+              background: `radial-gradient(circle at ${galleryHover.x}% ${galleryHover.y}%, rgba(255,255,255,0.12) 0%, transparent 60%)`,
+            }} />
           </div>
 
           {/* Info */}
@@ -99,18 +119,14 @@ export default function ProductPage() {
             </div>
 
             <div className={`product-stock-badge ${product.stock > 0 ? 'in-stock' : 'out-stock'}`}>
-              {product.stock > 0 ? (
-                <>✓ Stok tersedia: {product.stock} item</>
-              ) : (
-                <>✗ Stok habis</>
-              )}
+              {product.stock > 0 ? `✓ Stok tersedia: ${product.stock} item` : '✗ Stok habis'}
             </div>
 
             {product.description && (
               <div className="desc">{product.description}</div>
             )}
 
-            {/* Qty selector */}
+            {/* Qty */}
             <div className="qty-selector">
               <label>Jumlah</label>
               <div className="qty-controls">

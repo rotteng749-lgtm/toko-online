@@ -30,17 +30,17 @@ export default function AdminLogin() {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'var(--bg)', position: 'relative', overflow: 'hidden',
     }}>
-      {/* Background effects */}
+      {/* Background effects — anime style */}
       <div style={{
         position: 'absolute', top: '-200px', left: '50%', transform: 'translateX(-50%)',
         width: '600px', height: '600px',
-        background: 'radial-gradient(circle, rgba(108,92,231,0.15) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(192,132,252,0.15) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
       <div style={{
         position: 'absolute', bottom: '-200px', right: '-100px',
         width: '400px', height: '400px',
-        background: 'radial-gradient(circle, rgba(253,121,168,0.08) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(255,183,213,0.1) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
@@ -50,19 +50,19 @@ export default function AdminLogin() {
             width: 72, height: 72, borderRadius: 20, margin: '0 auto 20px',
             background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center',
             justifyContent: 'center', fontSize: 36,
-            boxShadow: '0 8px 30px rgba(108,92,231,0.3)',
+            boxShadow: '0 8px 30px rgba(192,132,252,0.3)',
           }}>
-            🛍️
+            🧹
           </div>
           <h1 style={{
-            fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 900,
-            background: 'var(--accent-gradient)',
+            fontFamily: 'var(--font-kawaii)', fontSize: 28, fontWeight: 900,
+            background: 'var(--sakura-gradient)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text', marginBottom: 8,
           }}>
-            Toko Admin
+            Toko Admin ✨
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Masuk ke panel admin</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Masuk ke panel admin~</p>
         </div>
 
         <form onSubmit={handleLogin} style={{
@@ -79,7 +79,7 @@ export default function AdminLogin() {
               transition: 'all 0.3s', backdropFilter: 'blur(10px)',
             }}
               value={username} onChange={e => setUsername(e.target.value)} autoFocus
-              onFocus={e => { e.target.style.borderColor = 'rgba(108,92,231,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(108,92,231,0.1)'; }}
+              onFocus={e => { e.target.style.borderColor = 'rgba(192,132,252,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.1)'; }}
               onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
             />
           </div>
@@ -92,21 +92,21 @@ export default function AdminLogin() {
               transition: 'all 0.3s', backdropFilter: 'blur(10px)',
             }}
               value={password} onChange={e => setPassword(e.target.value)}
-              onFocus={e => { e.target.style.borderColor = 'rgba(108,92,231,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(108,92,231,0.1)'; }}
+              onFocus={e => { e.target.style.borderColor = 'rgba(192,132,252,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.1)'; }}
               onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
             />
           </div>
           {error && (
             <div style={{
               padding: '12px 16px', borderRadius: 'var(--radius-xs)',
-              background: 'rgba(255,107,107,0.1)', color: '#f87171',
-              fontSize: 13, marginBottom: 20, border: '1px solid rgba(255,107,107,0.15)',
+              background: 'rgba(251,113,133,0.1)', color: '#fb7185',
+              fontSize: 13, marginBottom: 20, border: '1px solid rgba(251,113,133,0.15)',
             }}>
               {error}
             </div>
           )}
           <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: 16, fontSize: 15 }} disabled={loading}>
-            {loading ? '⏳ Masuk...' : '🚀 Masuk'}
+            {loading ? '⏳ Masuk...' : '✨ Masuk'}
           </button>
         </form>
       </div>
