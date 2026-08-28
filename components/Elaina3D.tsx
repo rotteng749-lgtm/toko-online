@@ -19,8 +19,8 @@ export default function Elaina3D() {
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(22, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(0, 6.5, 15);
-      camera.lookAt(0, 4, 0);
+      camera.position.set(0, 5.5, 13);
+      camera.lookAt(0, 4.5, 0);
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -72,6 +72,8 @@ export default function Elaina3D() {
         fbx.scale.setScalar(scale);
         fbx.position.sub(center.multiplyScalar(scale));
         fbx.position.y -= box.min.y * scale;
+        // Shift model DOWN so face is centered (hat is on top)
+        fbx.position.y -= 1.5;
 
         // Check for skeleton
         fbx.traverse((child: any) => {
