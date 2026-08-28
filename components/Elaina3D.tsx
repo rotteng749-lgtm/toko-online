@@ -37,7 +37,7 @@ export default function Elaina3D() {
       styleTag.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
       document.head.appendChild(styleTag);
 
-      // Textures — VRChat Elaina
+      // Textures
       const tl = new THREE.TextureLoader();
       function loadTex(name: string) {
         const t = tl.load('/models/elaina-vr/' + name);
@@ -55,7 +55,6 @@ export default function Elaina3D() {
       // Load FBX
       const loader = new FBXLoader();
       let model: any = null;
-      let skeletonObj: any = null;
       let boneMap: Record<string, any> = {};
       let hasSkeleton = false;
 
@@ -72,24 +71,19 @@ export default function Elaina3D() {
         fbx.scale.setScalar(scale);
         fbx.position.sub(center.multiplyScalar(scale));
         fbx.position.y -= box.min.y * scale;
-        // Shift model UP so face (below hat) comes into camera view
-        fbx.position.y += 1.5;
 
-        // Check for skeleton
+        // Find skeleton + bone map
         fbx.traverse((child: any) => {
           if (child.skeleton) {
-            skeletonObj = child.skeleton;
             hasSkeleton = true;
-            // Build bone map
             child.skeleton.bones.forEach((b: any) => {
+              boneMap[b.name] = b;
               boneMap[b.name.toLowerCase()] = b;
             });
           }
         });
 
-        console.log('Elaina VR: hasSkeleton=' + hasSkeleton + ', bones=' + Object.keys(boneMap).length);
-
-        // ===== APPLY TEXTURES =====
+        // Apply textures
         fbx.traverse((child: any) => {
           if (!child.isMesh) return;
           const meshName = (child.name || '').toLowerCase();
@@ -98,7 +92,6 @@ export default function Elaina3D() {
           child.material = srcMats.map((m: any) => {
             const matName = (m.name || '').toLowerCase();
 
-            // Outline
             if (matName.includes('outline')) {
               return new THREE.MeshBasicMaterial({
                 color: 0x2a1040, transparent: true, opacity: 0.45,
@@ -106,28 +99,37 @@ export default function Elaina3D() {
               });
             }
 
-            // Pick texture by mesh/material name
-            let tex = texBody; // default body
-            if (meshName.includes('hair') || matName.includes('hair')) tex = texHair;
-            else if (meshName.includes('face') || matName.includes('face')) tex = texFace;
-            else if (meshName.includes('dress') || matName.includes('dress')) tex = texDress;
-            else if (meshName.includes('coat') || matName.includes('coat')) tex = texCoat;
-            else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
-            else if (meshName.includes('brooch') || matName.includes('brooch')) tex = texBrooch;
-            else if (meshName.includes('broom') || matName.includes('broom')) tex = texBroom;
-            else if (matName.includes('eye')) {
-              // Eye material — skip texture, face texture already has eyes painted
+            if (matName.includes('eye')) {
               return new THREE.MeshBasicMaterial({
                 color: 0xffffff, side: THREE.DoubleSide,
                 transparent: true, opacity: 0.0, depthWrite: false,
               });
             }
 
+            let tex = texBody;
+            if (meshName.includes('hair') || matName.includes('hair')) tex = texHair;
+            else if (meshName.includes('face') || matName.includes('face')) tex = texFace;
+            else if (meshName.includes('dress') || matName.includes('dress')) tex = texDress;
+            else if (meshName.includes('coat') || matName.includes('coat')) tex = texCoat;
+            else if (meshName.includes('brooch') || matName.includes('brooch')) tex = texBrooch;
+            else if (meshName.includes('broom') || matName.includes('broom')) tex = texBroom;
+            else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
+
             return new THREE.MeshBasicMaterial({
               map: tex, color: 0xffffff, side: THREE.DoubleSide,
             });
           });
         });
+
+        // ===== FIX: MOVE BROOCH (HAT) UP =====
+        const brooch = boneMap['Brooch'] || boneMap['brooch'];
+        if (brooch) {
+          // Store original position
+          brooch.userData.origY = brooch.position.y;
+          // Move hat UP so face is visible
+          brooch.position.y += 1.2;
+          console.log('Brooch moved UP by 1.2');
+        }
 
         scene.add(fbx);
         if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
@@ -144,17 +146,16 @@ export default function Elaina3D() {
       };
       container.addEventListener('mousemove', onMouseMove);
 
-      // ===== ANIMATION =====
+      // Animation
       let time = 0;
       let baseY = 0;
       let baseSet = false;
 
-      // Bone name lookups (case-insensitive)
-      function findBone(keywords: string[]): any {
+      function findBone(keywords: string[]) {
         for (const key of keywords) {
           const lower = key.toLowerCase();
           for (const boneName of Object.keys(boneMap)) {
-            if (boneName.includes(lower)) return boneMap[boneName];
+            if (boneName.toLowerCase().includes(lower)) return boneMap[boneName];
           }
         }
         return null;
@@ -177,7 +178,6 @@ export default function Elaina3D() {
           model.rotation.x = Math.sin(time * 0.5) * 0.012;
           model.rotation.z = Math.sin(time * 0.7) * 0.006;
 
-          // Bone animation if skeleton exists
           if (hasSkeleton) {
             // Head tracking
             const head = findBone(['head']);
@@ -186,44 +186,75 @@ export default function Elaina3D() {
               head.rotation.x += (mouseY * -0.3 - head.rotation.x) * 0.06;
             }
 
-            // Neck subtle
+            // Neck
             const neck = findBone(['neck']);
-            if (neck) {
-              neck.rotation.y += (mouseX * 0.2 - neck.rotation.y) * 0.04;
-            }
+            if (neck) neck.rotation.y += (mouseX * 0.2 - neck.rotation.y) * 0.04;
 
             // Spine breathing
-            const spine = findBone(['spine', 'chest', 'torso']);
-            if (spine) {
-              spine.rotation.x = Math.sin(time * 1.2) * 0.03;
+            const spine = findBone(['spine']);
+            if (spine) spine.rotation.x = Math.sin(time * 1.2) * 0.03;
+
+            const chest = findBone(['chest']);
+            if (chest) {
+              chest.rotation.x = Math.sin(time * 1.2 + 0.3) * 0.02;
+              chest.rotation.z = Math.sin(time * 0.8) * 0.01;
             }
 
-            // Arms sway
-            const upperArmL = findBone(['leftupperarm', 'upperarm.l', 'upper arm_l', 'left arm']);
-            const lowerArmL = findBone(['leftlowerarm', 'lowerarm.l', 'lower arm_l']);
-            const upperArmR = findBone(['rightupperarm', 'upperarm.r', 'upper arm_r', 'right arm']);
-            const lowerArmR = findBone(['rightlowerarm', 'lowerarm.r', 'lower arm_r']);
+            // Arms — kawaii pose (slightly raised, gentle wave)
+            const upperArmL = findBone(['upper_arm_l', 'upperarm_l', 'upper arm_l']);
+            const upperArmR = findBone(['upper_arm_r', 'upperarm_r', 'upper arm_r']);
+            const shoulderL = findBone(['shoulder_l', 'shoulder_l']);
+            const shoulderR = findBone(['shoulder_r', 'shoulder_r']);
 
             if (upperArmL) {
-              upperArmL.rotation.z = -0.15 + Math.sin(time * 0.6) * 0.05;
-              upperArmL.rotation.x = Math.sin(time * 0.4 + 0.5) * 0.04;
+              // Kawaii: arms slightly raised, gentle wave
+              upperArmL.rotation.z = -0.3 + Math.sin(time * 0.6) * 0.08; // raised
+              upperArmL.rotation.x = -0.15 + Math.sin(time * 0.4) * 0.04; // forward
             }
-            if (lowerArmL) lowerArmL.rotation.z = -0.1 + Math.sin(time * 0.7 + 0.3) * 0.04;
             if (upperArmR) {
-              upperArmR.rotation.z = 0.15 + Math.sin(time * 0.6 + Math.PI) * 0.05;
-              upperArmR.rotation.x = Math.sin(time * 0.4 + 2.5) * 0.04;
+              upperArmR.rotation.z = 0.3 + Math.sin(time * 0.6 + Math.PI) * 0.08;
+              upperArmR.rotation.x = -0.15 + Math.sin(time * 0.4 + 2.5) * 0.04;
             }
-            if (lowerArmR) lowerArmR.rotation.z = 0.1 + Math.sin(time * 0.7 + 3.3) * 0.04;
+            if (shoulderL) shoulderL.rotation.z = Math.sin(time * 0.5) * 0.02;
+            if (shoulderR) shoulderR.rotation.z = Math.sin(time * 0.5 + Math.PI) * 0.02;
 
-            // Hips sway
-            const hips = findBone(['hip', 'pelvis']);
+            // Hips
+            const hips = findBone(['hip']);
             if (hips) hips.rotation.z = Math.sin(time * 0.4) * 0.015;
 
-            // Legs subtle
-            const upperLegL = findBone(['leftupperleg', 'upperleg.l', 'left leg']);
-            const upperLegR = findBone(['rightupperleg', 'upperleg.r', 'right leg']);
+            // Legs
+            const upperLegL = findBone(['upper_leg_l', 'upperleg_l']);
+            const upperLegR = findBone(['upper_leg_r', 'upperleg_r']);
             if (upperLegL) upperLegL.rotation.x = Math.sin(time * 0.3) * 0.02;
             if (upperLegR) upperLegR.rotation.x = Math.sin(time * 0.3 + Math.PI) * 0.02;
+
+            // Hair sway
+            const hairBones = ['hairback_01', 'hairback_02', 'hairback_03', 'hairfront_01', 'hairfront_02'];
+            hairBones.forEach((name, i) => {
+              const bone = findBone([name]);
+              if (bone) {
+                bone.rotation.x = Math.sin(time * 0.8 + i * 0.5) * 0.03;
+                bone.rotation.z = Math.sin(time * 0.6 + i * 0.3) * 0.02;
+              }
+            });
+
+            // Coat sway
+            const coatBones = ['coat_l_front', 'coat_r_front', 'coat_l_back_01', 'coat_r_back_01'];
+            coatBones.forEach((name, i) => {
+              const bone = findBone([name]);
+              if (bone) {
+                bone.rotation.z = Math.sin(time * 0.5 + i * 0.8) * 0.04;
+              }
+            });
+
+            // Skirt sway
+            const skirtBones = ['skirt_l_front', 'skirt_r_front', 'skirt_l_back', 'skirt_r_back'];
+            skirtBones.forEach((name, i) => {
+              const bone = findBone([name]);
+              if (bone) {
+                bone.rotation.z = Math.sin(time * 0.5 + i * 0.6) * 0.03;
+              }
+            });
           }
         }
 
