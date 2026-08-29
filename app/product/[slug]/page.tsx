@@ -13,6 +13,13 @@ export default function ProductPage() {
   const [qty, setQty] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [galleryHover, setGalleryHover] = useState({ x: 50, y: 50 });
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ customer_name: '', rating: 5, comment: '' });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [productId, setProductId] = useState<number | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('cart');
@@ -20,7 +27,18 @@ export default function ProductPage() {
     fetch(`/api/products?limit=100`).then(r => r.json()).then(d => {
       if (d.ok) {
         const p = d.products.find((p: Product) => p.slug === params.slug);
-        if (p) setProduct(p);
+        if (p) {
+          setProduct(p);
+          setProductId(p.id);
+          // Fetch reviews
+          fetch(`/api/reviews?product_id=${p.id}`).then(r => r.json()).then(rd => {
+            if (rd.ok) {
+              setReviews(rd.reviews);
+              setAvgRating(rd.avg_rating);
+              setTotalReviews(rd.total_reviews);
+            }
+          });
+        }
       }
     });
   }, [params.slug]);
@@ -168,6 +186,132 @@ export default function ProductPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* ===== REVIEWS SECTION ===== */}
+        <div className="reviews-section animate-fade-up" style={{ marginTop: 48, marginBottom: 60 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 800, margin: 0 }}>⭐ Ulasan</h2>
+              {totalReviews > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 999, background: 'rgba(254,202,87,0.1)', border: '1px solid rgba(254,202,87,0.2)' }}>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--warning)', fontFamily: 'var(--font-display)' }}>{avgRating.toFixed(1)}</span>
+                  <span style={{ color: 'var(--warning)', fontSize: 16 }}>{'⭐'.repeat(Math.round(avgRating))}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({totalReviews})</span>
+                </div>
+              )}
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowReviewForm(!showReviewForm)}>
+              {showReviewForm ? '✕ Tutup' : '✏️ Tulis Ulasan'}
+            </button>
+          </div>
+
+          {/* Review Form */}
+          {showReviewForm && (
+            <div style={{
+              background: 'var(--glass)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)', padding: 24, marginBottom: 24,
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>✍️ Tulis Ulasan Anda</h3>
+              <div className="form-group">
+                <label className="form-label">Nama</label>
+                <input className="form-input" value={reviewForm.customer_name}
+                  onChange={e => setReviewForm({ ...reviewForm, customer_name: e.target.value })}
+                  placeholder="Nama Anda" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Rating</label>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button key={star} onClick={() => setReviewForm({ ...reviewForm, rating: star })} style={{
+                      background: 'none', border: 'none', cursor: 'none', fontSize: 28, padding: 2,
+                      color: star <= reviewForm.rating ? 'var(--warning)' : 'var(--border)',
+                      transition: 'all 0.15s', transform: star <= reviewForm.rating ? 'scale(1.1)' : 'scale(1)',
+                    }}>⭐</button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Komentar</label>
+                <textarea className="form-textarea" value={reviewForm.comment}
+                  onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                  placeholder="Ceritakan pengalaman Anda dengan produk ini..." style={{ minHeight: 80 }} />
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={async () => {
+                if (!reviewForm.customer_name.trim()) {
+                  (window as any).showToast?.('Nama wajib diisi', 'error');
+                  return;
+                }
+                setReviewSubmitting(true);
+                try {
+                  const res = await fetch('/api/reviews', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: productId, ...reviewForm }),
+                  });
+                  const data = await res.json();
+                  if (data.ok) {
+                    (window as any).showToast?.('Ulasan berhasil ditambahkan! ✨', 'success');
+                    setShowReviewForm(false);
+                    setReviewForm({ customer_name: '', rating: 5, comment: '' });
+                    // Reload reviews
+                    fetch(`/api/reviews?product_id=${productId}`).then(r => r.json()).then(rd => {
+                      if (rd.ok) { setReviews(rd.reviews); setAvgRating(rd.avg_rating); setTotalReviews(rd.total_reviews); }
+                    });
+                  } else {
+                    (window as any).showToast?.(data.reason || 'Gagal', 'error');
+                  }
+                } catch {
+                  (window as any).showToast?.('Terjadi kesalahan', 'error');
+                } finally {
+                  setReviewSubmitting(false);
+                }
+              }} disabled={reviewSubmitting}>
+                {reviewSubmitting ? '⏳ Mengirim...' : '✨ Kirim Ulasan'}
+              </button>
+            </div>
+          )}
+
+          {/* Reviews List */}
+          {reviews.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+              <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Belum ada ulasan</p>
+              <p style={{ fontSize: 13 }}>Jadilah yang pertama memberikan ulasan!</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {reviews.map((review: any) => (
+                <div key={review.id} style={{
+                  padding: 18, borderRadius: 'var(--radius-md)',
+                  background: 'var(--glass)', border: '1px solid var(--border)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%',
+                        background: 'var(--accent-gradient)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        fontSize: 14, fontWeight: 700, color: '#fff',
+                      }}>{review.customer_name[0].toUpperCase()}</div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{review.customer_name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {new Date(review.created_at * 1000).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ color: 'var(--warning)', fontSize: 14 }}>
+                      {'⭐'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                    </div>
+                  </div>
+                  {review.comment && (
+                    <p style={{ margin: 0, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{review.comment}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -1059,3 +1059,20 @@ tr:last-child td { border-bottom: none; }
   .product-grid { grid-template-columns: 1fr; }
   .hero-3d-wrapper { height: 250px; }
 }
+
+/* ===== CART PAGE GRID RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .cart-page-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ===== ADMIN DASHBOARD RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .stat-card { min-width: 140px; }
+}
+
+/* ===== REVIEWS SECTION ===== */
+.reviews-section .form-group {
+  margin-bottom: 14px;
+}

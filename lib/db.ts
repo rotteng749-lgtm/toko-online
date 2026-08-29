@@ -65,6 +65,16 @@ export async function ensureDb(): Promise<void> {
       key TEXT PRIMARY KEY,
       value TEXT DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      customer_name TEXT NOT NULL,
+      rating INTEGER NOT NULL DEFAULT 5,
+      comment TEXT DEFAULT '',
+      created_at INTEGER DEFAULT (strftime('%s','now')),
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    );
   `);
 
   // Seed settings
