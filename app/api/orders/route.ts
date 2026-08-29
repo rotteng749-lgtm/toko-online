@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return jsonError('INVALID_REQUEST', 400);
   }
 
-  const { customer_name, phone, address, notes, items } = body;
+  const { customer_name, phone, address, notes, items, coupon_code, discount_amount, payment_proof_url } = body;
 
   if (!customer_name || !phone || !items || !items.length) {
     return jsonError('Nama, telepon, dan minimal 1 item wajib diisi', 400);
@@ -65,10 +65,12 @@ export async function POST(request: Request) {
   const orderCode = generateOrderCode();
   const itemsJson = JSON.stringify(validItems);
 
+  const finalTotal = Math.max(0, total - (discount_amount || 0));
+
   await db.execute({
-    sql: `INSERT INTO orders (order_code, customer_name, phone, address, notes, items_json, total, status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'new')`,
-    args: [orderCode, customer_name, phone, address || '', notes || '', itemsJson, total],
+    sql: `INSERT INTO orders (order_code, customer_name, phone, address, notes, items_json, total, status, payment_proof_url, payment_status, coupon_code, discount_amount)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?)`,
+    args: [orderCode, customer_name, phone, address || '', notes || '', itemsJson, finalTotal, payment_proof_url || '', payment_proof_url ? 'uploaded' : 'pending', coupon_code || '', discount_amount || 0],
   });
 
   // Build WhatsApp link

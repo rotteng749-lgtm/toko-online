@@ -75,7 +75,27 @@ export async function ensureDb(): Promise<void> {
       created_at INTEGER DEFAULT (strftime('%s','now')),
       FOREIGN KEY (product_id) REFERENCES products(id)
     );
+
+    CREATE TABLE IF NOT EXISTS coupons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      discount_type TEXT NOT NULL DEFAULT 'percent',
+      discount_value INTEGER NOT NULL DEFAULT 0,
+      min_order INTEGER DEFAULT 0,
+      max_uses INTEGER DEFAULT 0,
+      used_count INTEGER DEFAULT 0,
+      active INTEGER DEFAULT 1,
+      expires_at INTEGER DEFAULT 0,
+      created_at INTEGER DEFAULT (strftime('%s','now'))
+    );
   `);
+
+  // Add new columns (safe to run multiple times)
+  try { await db.execute('ALTER TABLE products ADD COLUMN variants_json TEXT DEFAULT "[]"'); } catch {}
+  try { await db.execute('ALTER TABLE orders ADD COLUMN payment_proof_url TEXT DEFAULT ""'); } catch {}
+  try { await db.execute('ALTER TABLE orders ADD COLUMN payment_status TEXT DEFAULT "pending"'); } catch {}
+  try { await db.execute('ALTER TABLE orders ADD COLUMN coupon_code TEXT DEFAULT ""'); } catch {}
+  try { await db.execute('ALTER TABLE orders ADD COLUMN discount_amount INTEGER DEFAULT 0'); } catch {}
 
   // Seed settings
   const defaults: Record<string, string> = {
