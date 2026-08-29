@@ -28,7 +28,7 @@ export default function Elaina3D() {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       container.appendChild(renderer.domElement);
 
-      // Loading indicator
+      // Loading
       const loadingDiv = document.createElement('div');
       loadingDiv.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#ffb7d5;font-size:14px;z-index:2;font-family:Inter,sans-serif;';
       loadingDiv.innerHTML = '<div style="width:40px;height:40px;border:3px solid rgba(255,183,213,0.2);border-top-color:#ffb7d5;border-radius:50%;animation:spin 0.8s linear infinite;"></div><span>Loading Elaina 3D...</span>';
@@ -49,15 +49,14 @@ export default function Elaina3D() {
       const texBody = loadTex('body.png');
       const texDress = loadTex('Dress.png');
       const texCoat = loadTex('Coat.png');
-      const texBroom = loadTex('broom.png');
 
       // Load FBX
       const loader = new FBXLoader();
       let model: any = null;
       let boneMap: Record<string, any> = {};
-      let bindPoseQuaternions: Map<string, any> = new Map();
       let hasSkeleton = false;
       let eyeMeshes: any[] = [];
+      let baseBoneRotations: Record<string, any> = {};
 
       loader.load('/models/elaina-vr/Elaina%20sk.fbx', (fbx) => {
         if (cancelled) return;
@@ -74,37 +73,30 @@ export default function Elaina3D() {
         fbx.position.y -= box.min.y * scale;
         fbx.position.y += 2.0;
 
-        // Find skeleton + save bind pose quaternions
+        // Find skeleton
         fbx.traverse((child: any) => {
           if (child.skeleton) {
             hasSkeleton = true;
+            console.log('=== SKELETON FOUND ===', child.skeleton.bones.length, 'bones');
             child.skeleton.bones.forEach((b: any) => {
               boneMap[b.name] = b;
-              boneMap[b.name.toLowerCase()] = b;
-              // Save the initial quaternion (bind pose)
-              bindPoseQuaternions.set(b.name, b.quaternion.clone());
             });
           }
         });
 
-        // ===== HIDE HAT/BROOCH/BROOM =====
-        const hideNames = ['brooch', 'broom', 'hat', 'witch hat', 'accessory', 'hat_'];
+        console.log('=== ALL BONE NAMES ===', Object.keys(boneMap).filter(k => !k.includes('end')));
+
+        // ===== HIDE HAT/BROOCH =====
         fbx.traverse((child: any) => {
           const n = (child.name || '').toLowerCase();
-          if (hideNames.some(h => n.includes(h))) {
+          if (n.includes('brooch') || n.includes('broom') || n.includes('hat_') || n.includes('witch hat')) {
             child.visible = false;
           }
         });
-        const broochBone = boneMap['Brooch'] || boneMap['brooch'];
+        const broochBone = boneMap['Brooch'];
         if (broochBone) {
           broochBone.visible = false;
           broochBone.traverse((c: any) => { c.visible = false; });
-        }
-        // Also hide Hat_01 bone
-        const hatBone = boneMap['Hat_01'] || boneMap['hat_01'];
-        if (hatBone) {
-          hatBone.visible = false;
-          hatBone.traverse((c: any) => { c.visible = false; });
         }
 
         // ===== APPLY TEXTURES =====
@@ -123,14 +115,12 @@ export default function Elaina3D() {
               });
             }
 
-            // Track eye meshes for blink animation
             if (matName.includes('eye')) {
-              const eyeMat = new THREE.MeshBasicMaterial({
+              eyeMeshes.push(child);
+              return new THREE.MeshBasicMaterial({
                 color: 0xffffff, side: THREE.DoubleSide,
                 transparent: true, opacity: 0.0, depthWrite: false,
               });
-              eyeMeshes.push(child);
-              return eyeMat;
             }
 
             let tex = texBody;
@@ -138,7 +128,6 @@ export default function Elaina3D() {
             else if (meshName.includes('face') || matName.includes('face')) tex = texFace;
             else if (meshName.includes('dress') || matName.includes('dress')) tex = texDress;
             else if (meshName.includes('coat') || matName.includes('coat')) tex = texCoat;
-            else if (meshName.includes('broom') || matName.includes('broom')) tex = texBroom;
             else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
 
             return new THREE.MeshBasicMaterial({
@@ -147,80 +136,76 @@ export default function Elaina3D() {
           });
         });
 
-        // ===== SET INITIAL KAWAII POSE =====
-        // Use quaternion multiply to ADD rotation on top of bind pose
-        function addBoneRotation(name: string, euler: { x?: number; y?: number; z?: number }) {
-          const bone = boneMap[name] || boneMap[name.toLowerCase()];
-          if (!bone) return;
-          const bindQ = bindPoseQuaternions.get(bone.name);
-          if (!bindQ) return;
-          const eulerObj = new THREE.Euler(
-            euler.x || 0, euler.y || 0, euler.z || 0
-          );
-          const additional = new THREE.Quaternion().setFromEuler(eulerObj);
-          const result = bindQ.clone().multiply(additional);
-          bone.quaternion.copy(result);
-        }
-
-        // KAWAII POSE:
-        // - Head tilted to the side (cute tilt)
-        // - Left arm raised up high (peace sign)
-        // - Right arm slightly raised
-        // - Fingers in cute pose
-
-        // Head tilt
-        addBoneRotation('Head', { z: 0.15, x: -0.05 }); // tilt right + slightly up
-
-        // Left arm raised UP (like waving)
-        addBoneRotation('Shoulder_L', { x: -0.3, z: -0.3 });
-        addBoneRotation('Upper_Arm_L', { z: -1.2, x: -0.5 }); // arm UP
-        addBoneRotation('Lower_Arm_L', { z: -0.6, x: 0.3 }); // bent elbow
-
-        // Right arm slightly raised
-        addBoneRotation('Shoulder_R', { x: -0.2, z: 0.2 });
-        addBoneRotation('Upper_Arm_R', { z: 0.4, x: -0.3 }); // arm slightly up
-        addBoneRotation('Lower_Arm_R', { z: 0.3, x: 0.2 }); // bent elbow
-
-        // Left hand fingers — peace sign
-        addBoneRotation('Thumb_L_1', { x: 0.3, z: -0.5 });
-        addBoneRotation('Index_L_1', { x: -0.8 }); // straight up
-        addBoneRotation('Index_L_2', { x: -0.2 });
-        addBoneRotation('Middle_L_1', { x: 0.5 }); // curled
-        addBoneRotation('Middle_L_2', { x: 0.4 });
-        addBoneRotation('Ring_L_1', { x: 0.5 });
-        addBoneRotation('Ring_L_2', { x: 0.4 });
-        addBoneRotation('Little_L_1', { x: 0.5 });
-        addBoneRotation('Little_L_2', { x: 0.4 });
-
-        // Right hand — relaxed pose
-        addBoneRotation('Thumb_R_1', { x: 0.2, z: 0.4 });
-        addBoneRotation('Index_R_1', { x: 0.3 });
-        addBoneRotation('Middle_R_1', { x: 0.4 });
-        addBoneRotation('Ring_R_1', { x: 0.4 });
-        addBoneRotation('Little_R_1', { x: 0.4 });
-
-        // Spine — slight lean
-        addBoneRotation('Spine', { x: -0.05, z: 0.03 });
-        addBoneRotation('Chest', { x: -0.03, z: 0.02 });
-
-        // Hips — slight tilt
-        addBoneRotation('Hips', { z: 0.02 });
-
-        // Save the kawaii pose quaternions as the NEW base
-        const kawaiiPoseQuaternions: Map<string, any> = new Map();
-        for (const [name, bone] of Object.entries(boneMap)) {
-          if (bone.isBone) {
-            kawaiiPoseQuaternions.set(bone.name, bone.quaternion.clone());
+        // ===== LOG INITIAL BONE ROTATIONS =====
+        const importantBones = ['Head', 'Neck', 'Spine', 'Chest', 'Upper_Arm_L', 'Upper_Arm_R', 'Lower_Arm_L', 'Lower_Arm_R', 'Shoulder_L', 'Shoulder_R', 'Wrist_L', 'Wrist_R', 'Hips'];
+        console.log('=== INITIAL BONE ROTATIONS ===');
+        importantBones.forEach(name => {
+          const bone = boneMap[name];
+          if (bone) {
+            console.log(`  ${name}: euler(${bone.rotation.x.toFixed(2)}, ${bone.rotation.y.toFixed(2)}, ${bone.rotation.z.toFixed(2)})`);
+          } else {
+            console.log(`  ${name}: NOT FOUND`);
           }
+        });
+
+        // ===== SET KAWAII POSE DIRECTLY =====
+        function setBoneRot(name: string, rx: number, ry: number, rz: number) {
+          const bone = boneMap[name];
+          if (!bone) {
+            console.warn(`Bone ${name} not found!`);
+            return;
+          }
+          bone.rotation.set(rx, ry, rz);
+          console.log(`Set ${name}: euler(${rx.toFixed(2)}, ${ry.toFixed(2)}, ${rz.toFixed(2)})`);
         }
+
+        // Head: tilt right + slight look up
+        setBoneRot('Head', -0.05, 0, 0.2);
+
+        // Neck: slight tilt
+        setBoneRot('Neck', 0, 0, 0.05);
+
+        // Spine/Chest: slight lean for cute pose
+        setBoneRot('Spine', -0.08, 0.02, 0.05);
+        setBoneRot('Chest', -0.04, 0, 0.03);
+
+        // Left arm: raised UP (waving/peace)
+        setBoneRot('Shoulder_L', -0.4, -0.3, -0.4);
+        setBoneRot('Upper_Arm_L', -0.6, 0, -1.5);  // arm up high
+        setBoneRot('Lower_Arm_L', 0.3, 0, -0.8);   // bent elbow
+
+        // Right arm: slightly raised (cute)
+        setBoneRot('Shoulder_R', -0.3, 0.3, 0.3);
+        setBoneRot('Upper_Arm_R', -0.3, 0, 0.5);   // arm slightly up
+        setBoneRot('Lower_Arm_R', 0.2, 0, 0.4);    // bent elbow
+
+        // Left hand fingers — peace sign attempt
+        setBoneRot('Index_L_1', -1.0, 0, 0);   // straight
+        setBoneRot('Index_L_2', -0.3, 0, 0);
+        setBoneRot('Middle_L_1', 0.6, 0, 0);    // curled
+        setBoneRot('Middle_L_2', 0.5, 0, 0);
+        setBoneRot('Ring_L_1', 0.6, 0, 0);
+        setBoneRot('Ring_L_2', 0.5, 0, 0);
+        setBoneRot('Little_L_1', 0.6, 0, 0);
+        setBoneRot('Little_L_2', 0.5, 0, 0);
+
+        // Right hand: relaxed
+        setBoneRot('Thumb_R_1', 0.2, 0.3, 0.4);
+        setBoneRot('Index_R_1', 0.3, 0, 0);
+        setBoneRot('Middle_R_1', 0.4, 0, 0);
+
+        // ===== SAVE BASE ROTATIONS (after kawaii pose) =====
+        for (const [name, bone] of Object.entries(boneMap)) {
+          baseBoneRotations[name] = bone.rotation.clone();
+        }
+
+        console.log('=== KAWAII POSE SET ===');
+        console.log('Base rotations saved for', Object.keys(baseBoneRotations).length, 'bones');
 
         scene.add(fbx);
         if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
 
-        // Store kawaiiPoseQuaternions for animation loop
-        (window as any).__kawaiiPose = kawaiiPoseQuaternions;
-
-        // ===== MOUSE =====
+        // Mouse
         let mouseX = 0, mouseY = 0;
         const onMouseMove = (e: MouseEvent) => {
           const rect = container.getBoundingClientRect();
@@ -231,75 +216,37 @@ export default function Elaina3D() {
 
         // ===== EYE BLINK =====
         let blinkTimer = 0;
-        let blinkInterval = 3; // seconds between blinks
-        let nextBlinkTime = 2;
-        let blinkProgress = -1; // -1 = not blinking
+        let nextBlinkAt = 2 + Math.random() * 3;
+        let blinkPhase = -1; // -1 = not blinking
 
         function updateBlink(dt: number) {
           blinkTimer += dt;
-          if (blinkProgress < 0 && blinkTimer >= nextBlinkTime) {
-            // Start blink
-            blinkProgress = 0;
+          if (blinkPhase < 0 && blinkTimer >= nextBlinkAt) {
+            blinkPhase = 0;
             blinkTimer = 0;
-            blinkInterval = 2 + Math.random() * 3; // 2-5 seconds between blinks
           }
-
-          if (blinkProgress >= 0) {
-            blinkProgress += dt * 8; // speed of blink
-            if (blinkProgress >= 4) {
-              // Blink complete
-              blinkProgress = -1;
-              nextBlinkTime = blinkInterval;
+          if (blinkPhase >= 0) {
+            blinkPhase += dt * 10; // fast blink
+            if (blinkPhase >= 4) {
+              blinkPhase = -1;
               blinkTimer = 0;
-              // Reset eye scale
+              nextBlinkAt = 2 + Math.random() * 3;
               eyeMeshes.forEach(m => { m.scale.y = 1; });
             } else {
-              let scaleY = 1;
-              if (blinkProgress < 1) {
-                scaleY = 1 - blinkProgress; // closing
-              } else if (blinkProgress < 2) {
-                scaleY = 0.02; // closed
-              } else if (blinkProgress < 3) {
-                scaleY = blinkProgress - 2; // opening
-              } else {
-                scaleY = 1 - (blinkProgress - 3); // settling
-              }
-              eyeMeshes.forEach(m => { m.scale.y = Math.max(0.02, scaleY); });
+              let sy = 1;
+              if (blinkPhase < 1) sy = 1 - blinkPhase;
+              else if (blinkPhase < 2) sy = 0.02;
+              else if (blinkPhase < 3) sy = blinkPhase - 2;
+              else sy = 1 - (blinkPhase - 3);
+              eyeMeshes.forEach(m => { m.scale.y = Math.max(0.02, sy); });
             }
           }
         }
 
-        // ===== ANIMATION LOOP =====
+        // ===== ANIMATION =====
         let time = 0;
         let lastTime = performance.now();
         let baseY = fbx.position.y;
-
-        function findBone(keywords: string[]) {
-          for (const key of keywords) {
-            const lower = key.toLowerCase();
-            for (const boneName of Object.keys(boneMap)) {
-              if (boneName.toLowerCase().includes(lower)) return boneMap[boneName];
-            }
-          }
-          return null;
-        }
-
-        // Helper: smoothly rotate bone from kawaii pose base
-        function animateBone(name: string, axis: 'x' | 'y' | 'z', targetOffset: number, speed: number) {
-          const bone = boneMap[name] || boneMap[name.toLowerCase()];
-          if (!bone) return;
-          const kawaiiBase = (window as any).__kawaiiPose?.get(bone.name);
-          if (!kawaiiBase) return;
-          // Create target quaternion = kawaii base * additional offset
-          const offsetEuler = new THREE.Euler(
-            axis === 'x' ? targetOffset : 0,
-            axis === 'y' ? targetOffset : 0,
-            axis === 'z' ? targetOffset : 0
-          );
-          const targetQ = kawaiiBase.clone().multiply(new THREE.Quaternion().setFromEuler(offsetEuler));
-          // Lerp from current to target
-          bone.quaternion.slerp(targetQ, speed);
-        }
 
         function animate() {
           animFrameId = requestAnimationFrame(animate);
@@ -315,80 +262,78 @@ export default function Elaina3D() {
             // Breathing float
             model.position.y = baseY + Math.sin(time * 1.2) * 0.08;
 
-            // Gentle sway
+            // Gentle body sway
             model.rotation.x = Math.sin(time * 0.5) * 0.012;
             model.rotation.z = Math.sin(time * 0.7) * 0.006;
 
             if (hasSkeleton) {
-              // Head tracking — add small rotation on top of kawaii pose
-              const head = findBone(['head']);
-              if (head) {
-                const kawaiiHead = (window as any).__kawaiiPose?.get(head.name);
-                if (kawaiiHead) {
-                  const headOffset = new THREE.Euler(
-                    mouseY * -0.2, // look up/down
-                    mouseX * 0.4,  // look left/right
-                    0.15 + Math.sin(time * 0.8) * 0.03 // kawaii tilt + subtle wobble
-                  );
-                  const headOffsetQ = new THREE.Quaternion().setFromEuler(headOffset);
-                  const targetQ = kawaiiHead.clone().multiply(headOffsetQ);
-                  head.quaternion.slerp(targetQ, 0.06);
-                }
+              // ===== RESET TO BASE + ADD ANIMATION DELTAS =====
+
+              // Head: base pose + mouse tracking + tilt wobble
+              const head = boneMap['Head'];
+              if (head && baseBoneRotations['Head']) {
+                head.rotation.copy(baseBoneRotations['Head']);
+                head.rotation.y += mouseX * 0.4;   // look left/right
+                head.rotation.x += mouseY * -0.2;  // look up/down
+                head.rotation.z += Math.sin(time * 0.8) * 0.04; // wobble
               }
 
-              const neck = findBone(['neck']);
-              if (neck) {
-                const kawaiiNeck = (window as any).__kawaiiPose?.get(neck.name);
-                if (kawaiiNeck) {
-                  const neckOffset = new THREE.Euler(0, mouseX * 0.15, 0);
-                  const neckOffsetQ = new THREE.Quaternion().setFromEuler(neckOffset);
-                  const targetQ = kawaiiNeck.clone().multiply(neckOffsetQ);
-                  neck.quaternion.slerp(targetQ, 0.04);
-                }
+              // Neck: subtle follow
+              const neck = boneMap['Neck'];
+              if (neck && baseBoneRotations['Neck']) {
+                neck.rotation.copy(baseBoneRotations['Neck']);
+                neck.rotation.y += mouseX * 0.15;
               }
 
-              // Arms — gentle wave on top of kawaii pose
-              animateBone('Upper_Arm_L', 'z',
-                -1.2 + Math.sin(time * 0.6) * 0.15, // wave
-                0.05
-              );
-              animateBone('Upper_Arm_L', 'x',
-                -0.5 + Math.sin(time * 0.4) * 0.08,
-                0.05
-              );
-              animateBone('Lower_Arm_L', 'z',
-                -0.6 + Math.sin(time * 0.6 + 0.5) * 0.1,
-                0.05
-              );
+              // Left arm: wave animation on top of kawaii pose
+              const upperArmL = boneMap['Upper_Arm_L'];
+              if (upperArmL && baseBoneRotations['Upper_Arm_L']) {
+                upperArmL.rotation.copy(baseBoneRotations['Upper_Arm_L']);
+                upperArmL.rotation.z += Math.sin(time * 0.6) * 0.15; // wave
+                upperArmL.rotation.x += Math.sin(time * 0.4) * 0.08;
+              }
 
-              // Right arm gentle sway
-              animateBone('Upper_Arm_R', 'z',
-                0.4 + Math.sin(time * 0.5 + Math.PI) * 0.08,
-                0.05
-              );
-              animateBone('Lower_Arm_R', 'x',
-                0.2 + Math.sin(time * 0.4 + 1.5) * 0.05,
-                0.05
-              );
+              const lowerArmL = boneMap['Lower_Arm_L'];
+              if (lowerArmL && baseBoneRotations['Lower_Arm_L']) {
+                lowerArmL.rotation.copy(baseBoneRotations['Lower_Arm_L']);
+                lowerArmL.rotation.z += Math.sin(time * 0.6 + 0.5) * 0.1;
+              }
+
+              // Right arm: gentle sway
+              const upperArmR = boneMap['Upper_Arm_R'];
+              if (upperArmR && baseBoneRotations['Upper_Arm_R']) {
+                upperArmR.rotation.copy(baseBoneRotations['Upper_Arm_R']);
+                upperArmR.rotation.z += Math.sin(time * 0.5 + Math.PI) * 0.08;
+              }
 
               // Spine/Chest breathing
-              animateBone('Spine', 'x', -0.05 + Math.sin(time * 1.2) * 0.02, 0.04);
-              animateBone('Chest', 'z', 0.02 + Math.sin(time * 0.8) * 0.01, 0.04);
+              const spine = boneMap['Spine'];
+              if (spine && baseBoneRotations['Spine']) {
+                spine.rotation.copy(baseBoneRotations['Spine']);
+                spine.rotation.x += Math.sin(time * 1.2) * 0.02;
+              }
+              const chest = boneMap['Chest'];
+              if (chest && baseBoneRotations['Chest']) {
+                chest.rotation.copy(baseBoneRotations['Chest']);
+                chest.rotation.z += Math.sin(time * 0.8) * 0.01;
+              }
 
               // Hair sway
-              ['HairBack_01', 'HairBack_02', 'HairBack_03', 'HairFront_01', 'HairFront_02'].forEach((name, i) => {
-                const bone = boneMap[name] || boneMap[name.toLowerCase()];
-                if (bone) {
-                  bone.rotation.x += Math.sin(time * 0.8 + i * 0.5) * 0.002;
-                  bone.rotation.z += Math.sin(time * 0.6 + i * 0.3) * 0.001;
+              ['HairBack_01', 'HairBack_02', 'HairBack_03', 'HairFront_01', 'HairFront_02'].forEach((bname, i) => {
+                const bone = boneMap[bname];
+                if (bone && baseBoneRotations[bname]) {
+                  bone.rotation.copy(baseBoneRotations[bname]);
+                  bone.rotation.x += Math.sin(time * 0.8 + i * 0.5) * 0.04;
+                  bone.rotation.z += Math.sin(time * 0.6 + i * 0.3) * 0.03;
                 }
               });
 
-              // Coat/Skirt gentle sway
-              ['Coat_L_Front', 'Coat_R_Front', 'Skirt_L_Front', 'Skirt_R_Front'].forEach((name, i) => {
-                const bone = boneMap[name] || boneMap[name.toLowerCase()];
-                if (bone) {
-                  bone.rotation.z += Math.sin(time * 0.5 + i * 0.8) * 0.001;
+              // Coat/Skirt sway
+              ['Coat_L_Front', 'Coat_R_Front', 'Skirt_L_Front', 'Skirt_R_Front'].forEach((bname, i) => {
+                const bone = boneMap[bname];
+                if (bone && baseBoneRotations[bname]) {
+                  bone.rotation.copy(baseBoneRotations[bname]);
+                  bone.rotation.z += Math.sin(time * 0.5 + i * 0.8) * 0.04;
                 }
               });
             }
@@ -401,7 +346,7 @@ export default function Elaina3D() {
         }
         animate();
 
-        // Resize handler
+        // Resize
         const onResize = () => {
           if (!container.clientWidth) return;
           camera.aspect = container.clientWidth / container.clientHeight;
@@ -426,7 +371,6 @@ export default function Elaina3D() {
           if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
           if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
           if (styleTag.parentNode) styleTag.parentNode.removeChild(styleTag);
-          delete (window as any).__kawaiiPose;
         };
       }, undefined, (err) => {
         if (!cancelled) console.error('FBX error:', err);
