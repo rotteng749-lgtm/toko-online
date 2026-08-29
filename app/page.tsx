@@ -5,6 +5,8 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 const Elaina3D = dynamic(() => import('../components/Elaina3D'), { ssr: false });
+const RecentlyViewed = dynamic(() => import('../components/RecentlyViewed'), { ssr: false });
+const NewsletterForm = dynamic(() => import('../components/NewsletterForm'), { ssr: false });
 
 interface Product {
   id: number; name: string; slug: string; price: number; sale_price: number;
@@ -227,6 +229,11 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* Recently Viewed */}
+      <div className="container">
+        <RecentlyViewed />
+      </div>
+
       {/* Footer */}
       <footer className="footer">
         <div className="footer-inner">
@@ -238,6 +245,10 @@ export default function HomePage() {
             <Link href="/">🏠 Beranda</Link>
             <Link href="/track">📍 Lacak Pesanan</Link>
             <Link href="/admin">⚡ Admin</Link>
+          </div>
+          <div style={{ marginTop: 20 }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #fff)', marginBottom: 8 }}>📬 Newsletter</p>
+            <NewsletterForm />
           </div>
           <div className="footer-bottom">
             © {new Date().getFullYear()} {storeName}. Made with ✨ by Elaina~

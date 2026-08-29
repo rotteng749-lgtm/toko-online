@@ -3,6 +3,8 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import ProductQA from '@/components/ProductQA';
+import { trackView } from '@/components/RecentlyViewed';
 
 interface Product { id: number; name: string; slug: string; price: number; sale_price: number; stock: number; image_url: string; description: string; category_name: string; }
 interface CartItem { product: Product; qty: number; }
@@ -30,6 +32,7 @@ export default function ProductPage() {
         if (p) {
           setProduct(p);
           setProductId(p.id);
+          trackView(p);
           // Fetch reviews
           fetch(`/api/reviews?product_id=${p.id}`).then(r => r.json()).then(rd => {
             if (rd.ok) {
@@ -186,9 +189,14 @@ export default function ProductPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>          {/* ===== Q&A SECTION ===== */}
+          {productId && (
+            <div className="animate-fade-up" style={{ marginTop: 48 }}>
+              <ProductQA productId={productId} />
+            </div>
+          )}
 
-        {/* ===== REVIEWS SECTION ===== */}
+          {/* ===== REVIEWS SECTION ===== */}
         <div className="reviews-section animate-fade-up" style={{ marginTop: 48, marginBottom: 60 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

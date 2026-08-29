@@ -14,7 +14,7 @@ export default function Elaina3D() {
 
     async function init() {
       const THREE = await import('three');
-      const { FBXLoader } = await import('three/addons/loaders/FBXLoader.js');
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
       if (cancelled) return;
 
       const scene = new THREE.Scene();
@@ -28,7 +28,7 @@ export default function Elaina3D() {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       container.appendChild(renderer.domElement);
 
-      // Loading
+      // Loading indicator
       const loadingDiv = document.createElement('div');
       loadingDiv.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#ffb7d5;font-size:14px;z-index:2;font-family:Inter,sans-serif;';
       loadingDiv.innerHTML = '<div style="width:40px;height:40px;border:3px solid rgba(255,183,213,0.2);border-top-color:#ffb7d5;border-radius:50%;animation:spin 0.8s linear infinite;"></div><span>Loading Elaina 3D...</span>';
@@ -37,29 +37,17 @@ export default function Elaina3D() {
       styleTag.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
       document.head.appendChild(styleTag);
 
-      // Textures
-      const tl = new THREE.TextureLoader();
-      function loadTex(name: string) {
-        const t = tl.load('/models/elaina-vr/' + name);
-        t.colorSpace = THREE.SRGBColorSpace;
-        return t;
-      }
-      const texFace = loadTex('Face.png');
-      const texHair = loadTex('Hair.png');
-      const texBody = loadTex('body.png');
-      const texDress = loadTex('Dress.png');
-      const texCoat = loadTex('Coat.png');
-
-      // Load FBX
-      const loader = new FBXLoader();
+      // Load GLB (pre-processed by Blender: hat removed, kawaii pose, textures embedded)
+      const loader = new GLTFLoader();
       let model: any = null;
       let boneMap: Record<string, any> = {};
       let hasSkeleton = false;
       let eyeMeshes: any[] = [];
       let baseBoneRotations: Record<string, any> = {};
 
-      loader.load('/models/elaina-vr/Elaina%20sk.fbx', (fbx) => {
+      loader.load('/models/elaina.glb', (gltf) => {
         if (cancelled) return;
+        const fbx = gltf.scene;
         model = fbx;
 
         // Scale + center
@@ -73,7 +61,7 @@ export default function Elaina3D() {
         fbx.position.y -= box.min.y * scale;
         fbx.position.y += 2.0;
 
-        // Find skeleton
+        // Find skeleton + collect bone map
         fbx.traverse((child: any) => {
           if (child.skeleton) {
             hasSkeleton = true;
@@ -86,126 +74,28 @@ export default function Elaina3D() {
 
         console.log('=== ALL BONE NAMES ===', Object.keys(boneMap).filter(k => !k.includes('end')));
 
-        // ===== HIDE HAT/BROOCH =====
+        // Identify eye meshes for blink animation
         fbx.traverse((child: any) => {
+          if (!child.isMesh) return;
           const n = (child.name || '').toLowerCase();
-          if (n.includes('brooch') || n.includes('broom') || n.includes('hat_') || n.includes('witch hat')) {
-            child.visible = false;
-          }
-        });
-        const broochBone = boneMap['Brooch'];
-        if (broochBone) {
-          broochBone.visible = false;
-          broochBone.traverse((c: any) => { c.visible = false; });
-        }
-
-        // ===== APPLY TEXTURES =====
-        fbx.traverse((child: any) => {
-          if (!child.isMesh || !child.visible) return;
-          const meshName = (child.name || '').toLowerCase();
-          const srcMats = Array.isArray(child.material) ? child.material : [child.material];
-
-          child.material = srcMats.map((m: any) => {
-            const matName = (m.name || '').toLowerCase();
-
-            if (matName.includes('outline')) {
-              return new THREE.MeshBasicMaterial({
-                color: 0x2a1040, transparent: true, opacity: 0.45,
-                side: THREE.BackSide, depthWrite: false,
-              });
-            }
-
-            if (matName.includes('eye')) {
-              eyeMeshes.push(child);
-              return new THREE.MeshBasicMaterial({
-                color: 0xffffff, side: THREE.DoubleSide,
-                transparent: true, opacity: 0.0, depthWrite: false,
-              });
-            }
-
-            let tex = texBody;
-            if (meshName.includes('hair') || matName.includes('hair')) tex = texHair;
-            else if (meshName.includes('face') || matName.includes('face')) tex = texFace;
-            else if (meshName.includes('dress') || matName.includes('dress')) tex = texDress;
-            else if (meshName.includes('coat') || matName.includes('coat')) tex = texCoat;
-            else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
-
-            return new THREE.MeshBasicMaterial({
-              map: tex, color: 0xffffff, side: THREE.DoubleSide,
-            });
-          });
-        });
-
-        // ===== LOG INITIAL BONE ROTATIONS =====
-        const importantBones = ['Head', 'Neck', 'Spine', 'Chest', 'Upper_Arm_L', 'Upper_Arm_R', 'Lower_Arm_L', 'Lower_Arm_R', 'Shoulder_L', 'Shoulder_R', 'Wrist_L', 'Wrist_R', 'Hips'];
-        console.log('=== INITIAL BONE ROTATIONS ===');
-        importantBones.forEach(name => {
-          const bone = boneMap[name];
-          if (bone) {
-            console.log(`  ${name}: euler(${bone.rotation.x.toFixed(2)}, ${bone.rotation.y.toFixed(2)}, ${bone.rotation.z.toFixed(2)})`);
-          } else {
-            console.log(`  ${name}: NOT FOUND`);
+          if (n.includes('eye')) {
+            eyeMeshes.push(child);
           }
         });
 
-        // ===== SET KAWAII POSE DIRECTLY =====
-        function setBoneRot(name: string, rx: number, ry: number, rz: number) {
-          const bone = boneMap[name];
-          if (!bone) {
-            console.warn(`Bone ${name} not found!`);
-            return;
-          }
-          bone.rotation.set(rx, ry, rz);
-          console.log(`Set ${name}: euler(${rx.toFixed(2)}, ${ry.toFixed(2)}, ${rz.toFixed(2)})`);
-        }
+        console.log('Eye meshes found:', eyeMeshes.length);
 
-        // Head: tilt right + slight look up
-        setBoneRot('Head', -0.05, 0, 0.2);
-
-        // Neck: slight tilt
-        setBoneRot('Neck', 0, 0, 0.05);
-
-        // Spine/Chest: slight lean for cute pose
-        setBoneRot('Spine', -0.08, 0.02, 0.05);
-        setBoneRot('Chest', -0.04, 0, 0.03);
-
-        // Left arm: raised UP (waving/peace)
-        setBoneRot('Shoulder_L', -0.4, -0.3, -0.4);
-        setBoneRot('Upper_Arm_L', -0.6, 0, -1.5);  // arm up high
-        setBoneRot('Lower_Arm_L', 0.3, 0, -0.8);   // bent elbow
-
-        // Right arm: slightly raised (cute)
-        setBoneRot('Shoulder_R', -0.3, 0.3, 0.3);
-        setBoneRot('Upper_Arm_R', -0.3, 0, 0.5);   // arm slightly up
-        setBoneRot('Lower_Arm_R', 0.2, 0, 0.4);    // bent elbow
-
-        // Left hand fingers — peace sign attempt
-        setBoneRot('Index_L_1', -1.0, 0, 0);   // straight
-        setBoneRot('Index_L_2', -0.3, 0, 0);
-        setBoneRot('Middle_L_1', 0.6, 0, 0);    // curled
-        setBoneRot('Middle_L_2', 0.5, 0, 0);
-        setBoneRot('Ring_L_1', 0.6, 0, 0);
-        setBoneRot('Ring_L_2', 0.5, 0, 0);
-        setBoneRot('Little_L_1', 0.6, 0, 0);
-        setBoneRot('Little_L_2', 0.5, 0, 0);
-
-        // Right hand: relaxed
-        setBoneRot('Thumb_R_1', 0.2, 0.3, 0.4);
-        setBoneRot('Index_R_1', 0.3, 0, 0);
-        setBoneRot('Middle_R_1', 0.4, 0, 0);
-
-        // ===== SAVE BASE ROTATIONS (after kawaii pose) =====
+        // ===== SAVE BASE ROTATIONS (from Blender-posed model) =====
         for (const [name, bone] of Object.entries(boneMap)) {
           baseBoneRotations[name] = bone.rotation.clone();
         }
 
-        console.log('=== KAWAII POSE SET ===');
-        console.log('Base rotations saved for', Object.keys(baseBoneRotations).length, 'bones');
+        console.log('=== BASE ROTATIONS SAVED ===', Object.keys(baseBoneRotations).length, 'bones');
 
         scene.add(fbx);
         if (loadingDiv.parentNode) loadingDiv.parentNode.removeChild(loadingDiv);
 
-        // Mouse
+        // Mouse tracking
         let mouseX = 0, mouseY = 0;
         const onMouseMove = (e: MouseEvent) => {
           const rect = container.getBoundingClientRect();
@@ -214,7 +104,7 @@ export default function Elaina3D() {
         };
         container.addEventListener('mousemove', onMouseMove);
 
-        // ===== EYE BLINK =====
+        // ===== EYE BLINK SYSTEM =====
         let blinkTimer = 0;
         let nextBlinkAt = 2 + Math.random() * 3;
         let blinkPhase = -1; // -1 = not blinking
@@ -226,7 +116,7 @@ export default function Elaina3D() {
             blinkTimer = 0;
           }
           if (blinkPhase >= 0) {
-            blinkPhase += dt * 10; // fast blink
+            blinkPhase += dt * 12; // fast blink
             if (blinkPhase >= 4) {
               blinkPhase = -1;
               blinkTimer = 0;
@@ -234,19 +124,19 @@ export default function Elaina3D() {
               eyeMeshes.forEach(m => { m.scale.y = 1; });
             } else {
               let sy = 1;
-              if (blinkPhase < 1) sy = 1 - blinkPhase;
-              else if (blinkPhase < 2) sy = 0.02;
-              else if (blinkPhase < 3) sy = blinkPhase - 2;
-              else sy = 1 - (blinkPhase - 3);
+              if (blinkPhase < 1) sy = 1 - blinkPhase;        // closing
+              else if (blinkPhase < 2) sy = 0.02;              // closed
+              else if (blinkPhase < 3) sy = blinkPhase - 2;    // opening
+              else sy = 1 - (blinkPhase - 3);                  // settling
               eyeMeshes.forEach(m => { m.scale.y = Math.max(0.02, sy); });
             }
           }
         }
 
-        // ===== ANIMATION =====
+        // ===== ANIMATION LOOP =====
         let time = 0;
         let lastTime = performance.now();
-        let baseY = fbx.position.y;
+        const baseY = fbx.position.y;
 
         function animate() {
           animFrameId = requestAnimationFrame(animate);
@@ -256,7 +146,7 @@ export default function Elaina3D() {
           time += dt;
 
           if (model) {
-            // Body follows mouse
+            // Body follows mouse (subtle rotation)
             model.rotation.y += (mouseX * 0.3 - model.rotation.y) * 0.04;
 
             // Breathing float
@@ -267,14 +157,12 @@ export default function Elaina3D() {
             model.rotation.z = Math.sin(time * 0.7) * 0.006;
 
             if (hasSkeleton) {
-              // ===== RESET TO BASE + ADD ANIMATION DELTAS =====
-
               // Head: base pose + mouse tracking + tilt wobble
               const head = boneMap['Head'];
               if (head && baseBoneRotations['Head']) {
                 head.rotation.copy(baseBoneRotations['Head']);
-                head.rotation.y += mouseX * 0.4;   // look left/right
-                head.rotation.x += mouseY * -0.2;  // look up/down
+                head.rotation.y += mouseX * 0.4;    // look left/right
+                head.rotation.x += mouseY * -0.2;   // look up/down
                 head.rotation.z += Math.sin(time * 0.8) * 0.04; // wobble
               }
 
@@ -285,11 +173,11 @@ export default function Elaina3D() {
                 neck.rotation.y += mouseX * 0.15;
               }
 
-              // Left arm: wave animation on top of kawaii pose
+              // Left arm: wave animation
               const upperArmL = boneMap['Upper_Arm_L'];
               if (upperArmL && baseBoneRotations['Upper_Arm_L']) {
                 upperArmL.rotation.copy(baseBoneRotations['Upper_Arm_L']);
-                upperArmL.rotation.z += Math.sin(time * 0.6) * 0.15; // wave
+                upperArmL.rotation.z += Math.sin(time * 0.6) * 0.15;
                 upperArmL.rotation.x += Math.sin(time * 0.4) * 0.08;
               }
 
@@ -346,7 +234,7 @@ export default function Elaina3D() {
         }
         animate();
 
-        // Resize
+        // Resize handler
         const onResize = () => {
           if (!container.clientWidth) return;
           camera.aspect = container.clientWidth / container.clientHeight;
@@ -373,7 +261,7 @@ export default function Elaina3D() {
           if (styleTag.parentNode) styleTag.parentNode.removeChild(styleTag);
         };
       }, undefined, (err) => {
-        if (!cancelled) console.error('FBX error:', err);
+        if (!cancelled) console.error('GLB error:', err);
       });
     }
 
