@@ -22,10 +22,25 @@ export default function Elaina3D() {
       camera.position.set(0, 4.0, 12);
       camera.lookAt(0, 3.5, 0);
 
+      // === LIGHTS (GLB uses PBR materials, needs lighting) ===
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+      dirLight.position.set(5, 10, 7);
+      scene.add(dirLight);
+      const backLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      backLight.position.set(-5, 5, -5);
+      scene.add(backLight);
+      const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      fillLight.position.set(-3, 8, 3);
+      scene.add(fillLight);
+
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.5;
       container.appendChild(renderer.domElement);
 
       // Loading indicator
@@ -73,6 +88,29 @@ export default function Elaina3D() {
         });
 
         console.log('=== ALL BONE NAMES ===', Object.keys(boneMap).filter(k => !k.includes('end')));
+
+        // Override materials: if any mesh has no texture (black), use white fallback
+        fbx.traverse((child: any) => {
+          if (!child.isMesh) return;
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          child.material = mats.map((m: any) => {
+            // If material has no texture map and is too dark, make it visible
+            if (m.map) {
+              // Has texture - keep it but ensure it's visible
+              return new THREE.MeshBasicMaterial({ map: m.map, side: THREE.DoubleSide });
+            }
+            // No texture - check if it's outline (dark) or body (should be white)
+            const name = (m.name || '').toLowerCase();
+            if (name.includes('outline')) {
+              return new THREE.MeshBasicMaterial({
+                color: 0x2a1040, transparent: true, opacity: 0.45,
+                side: THREE.BackSide, depthWrite: false,
+              });
+            }
+            // Default: white so model is visible
+            return new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+          });
+        });
 
         // Identify eye meshes for blink animation
         fbx.traverse((child: any) => {
