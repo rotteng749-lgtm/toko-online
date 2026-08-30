@@ -19,8 +19,8 @@ export default function Elaina3D() {
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(22, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(0, 5.5, 13);
-      camera.lookAt(0, 4.5, 0);
+      camera.position.set(0, 3.0, 14);
+      camera.lookAt(0, 2.5, 0);
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -49,6 +49,20 @@ export default function Elaina3D() {
       const texBody = loadTex('body.png');
       const texDress = loadTex('Dress.png');
       const texCoat = loadTex('Coat.png');
+
+      // Log texture loading status
+      let texLoaded = 0;
+      const checkTexLoaded = () => {
+        texLoaded++;
+        console.log('[TEX] Loaded', texLoaded, '/5 textures');
+      };
+      texFace.source.data?.addEventListener?.('load', checkTexLoaded);
+      texHair.source.data?.addEventListener?.('load', checkTexLoaded);
+      texBody.source.data?.addEventListener?.('load', checkTexLoaded);
+      texDress.source.data?.addEventListener?.('load', checkTexLoaded);
+      texCoat.source.data?.addEventListener?.('load', checkTexLoaded);
+      // Fallback: just log after delay
+      setTimeout(() => console.log('[TEX] After 3s - Face:', texFace.image?.complete, 'Hair:', texHair.image?.complete, 'Body:', texBody.image?.complete), 3000);
 
       // Load FBX
       const loader = new FBXLoader();
@@ -99,10 +113,14 @@ export default function Elaina3D() {
         });
 
         // ===== APPLY TEXTURES (MeshBasicMaterial - NO lighting needed) =====
+        let meshCount = 0;
         fbx.traverse((child: any) => {
           if (!child.isMesh || !child.visible) return;
+          meshCount++;
           const meshName = (child.name || '').toLowerCase();
           const srcMats = Array.isArray(child.material) ? child.material : [child.material];
+
+          console.log('[MAT] Mesh:', child.name, '| materials:', srcMats.map((m: any) => m.name).join(', '));
 
           child.material = srcMats.map((m: any) => {
             const matName = (m.name || '').toLowerCase();
@@ -131,11 +149,14 @@ export default function Elaina3D() {
             else if (meshName.includes('coat') || matName.includes('coat')) tex = texCoat;
             else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
 
+            console.log('[MAT]   →', matName, '→ texture:', tex === texFace ? 'Face' : tex === texHair ? 'Hair' : tex === texDress ? 'Dress' : tex === texCoat ? 'Coat' : 'Body');
+
             return new THREE.MeshBasicMaterial({
               map: tex, color: 0xffffff, side: THREE.DoubleSide,
             });
           });
         });
+        console.log('[MAT] Total visible meshes:', meshCount);
 
         // ===== SAVE BASE ROTATIONS =====
         for (const [name, bone] of Object.entries(boneMap)) {
