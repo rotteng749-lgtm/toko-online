@@ -14,36 +14,21 @@ export default function Elaina3D() {
 
     async function init() {
       const THREE = await import('three');
-      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+      const { FBXLoader } = await import('three/addons/loaders/FBXLoader.js');
       if (cancelled) return;
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(22, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(0, 4.0, 12);
-      camera.lookAt(0, 3.5, 0);
-
-      // === LIGHTS (GLB uses PBR materials, needs lighting) ===
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
-      scene.add(ambientLight);
-      const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
-      dirLight.position.set(5, 10, 7);
-      scene.add(dirLight);
-      const backLight = new THREE.DirectionalLight(0xffffff, 1.0);
-      backLight.position.set(-5, 5, -5);
-      scene.add(backLight);
-      const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      fillLight.position.set(-3, 8, 3);
-      scene.add(fillLight);
+      camera.position.set(0, 5.5, 13);
+      camera.lookAt(0, 4.5, 0);
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.5;
       container.appendChild(renderer.domElement);
 
-      // Loading indicator
+      // Loading
       const loadingDiv = document.createElement('div');
       loadingDiv.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#ffb7d5;font-size:14px;z-index:2;font-family:Inter,sans-serif;';
       loadingDiv.innerHTML = '<div style="width:40px;height:40px;border:3px solid rgba(255,183,213,0.2);border-top-color:#ffb7d5;border-radius:50%;animation:spin 0.8s linear infinite;"></div><span>Loading Elaina 3D...</span>';
@@ -52,17 +37,29 @@ export default function Elaina3D() {
       styleTag.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
       document.head.appendChild(styleTag);
 
-      // Load GLB (pre-processed by Blender: hat removed, kawaii pose, textures embedded)
-      const loader = new GLTFLoader();
+      // Load textures
+      const tl = new THREE.TextureLoader();
+      function loadTex(name: string) {
+        const t = tl.load('/models/elaina-vr/' + name);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+      const texFace = loadTex('Face.png');
+      const texHair = loadTex('Hair.png');
+      const texBody = loadTex('body.png');
+      const texDress = loadTex('Dress.png');
+      const texCoat = loadTex('Coat.png');
+
+      // Load FBX
+      const loader = new FBXLoader();
       let model: any = null;
       let boneMap: Record<string, any> = {};
       let hasSkeleton = false;
       let eyeMeshes: any[] = [];
       let baseBoneRotations: Record<string, any> = {};
 
-      loader.load('/models/elaina.glb', (gltf) => {
+      loader.load('/models/elaina-vr/Elaina%20sk.fbx', (fbx) => {
         if (cancelled) return;
-        const fbx = gltf.scene;
         model = fbx;
 
         // Scale + center
@@ -76,54 +73,71 @@ export default function Elaina3D() {
         fbx.position.y -= box.min.y * scale;
         fbx.position.y += 2.0;
 
-        // Find skeleton + collect bone map
+        // Find skeleton + bone map
         fbx.traverse((child: any) => {
           if (child.skeleton) {
             hasSkeleton = true;
             console.log('=== SKELETON FOUND ===', child.skeleton.bones.length, 'bones');
-            child.skeleton.bones.forEach((b: any) => {
-              boneMap[b.name] = b;
-            });
+            child.skeleton.bones.forEach((b: any) => { boneMap[b.name] = b; });
           }
         });
 
-        console.log('=== ALL BONE NAMES ===', Object.keys(boneMap).filter(k => !k.includes('end')));
-
-        // Override materials: if any mesh has no texture (black), use white fallback
+        // ===== HIDE HAT/BROOCH =====
+        fbx.traverse((child: any) => {
+          const n = (child.name || '').toLowerCase();
+          if (n.includes('hat') || n.includes('broom') || n.includes('wand')) {
+            child.visible = false;
+          }
+        });
+        // Also hide by mesh name
         fbx.traverse((child: any) => {
           if (!child.isMesh) return;
-          const mats = Array.isArray(child.material) ? child.material : [child.material];
-          child.material = mats.map((m: any) => {
-            // If material has no texture map and is too dark, make it visible
-            if (m.map) {
-              // Has texture - keep it but ensure it's visible
-              return new THREE.MeshBasicMaterial({ map: m.map, side: THREE.DoubleSide });
-            }
-            // No texture - check if it's outline (dark) or body (should be white)
-            const name = (m.name || '').toLowerCase();
-            if (name.includes('outline')) {
+          const n = (child.name || '').toLowerCase();
+          if (n.includes('hat') || n.includes('wand') || n.includes('broom')) {
+            child.visible = false;
+          }
+        });
+
+        // ===== APPLY TEXTURES (MeshBasicMaterial - NO lighting needed) =====
+        fbx.traverse((child: any) => {
+          if (!child.isMesh || !child.visible) return;
+          const meshName = (child.name || '').toLowerCase();
+          const srcMats = Array.isArray(child.material) ? child.material : [child.material];
+
+          child.material = srcMats.map((m: any) => {
+            const matName = (m.name || '').toLowerCase();
+
+            // Outline materials → dark transparent
+            if (matName.includes('outline')) {
               return new THREE.MeshBasicMaterial({
                 color: 0x2a1040, transparent: true, opacity: 0.45,
                 side: THREE.BackSide, depthWrite: false,
               });
             }
-            // Default: white so model is visible
-            return new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+
+            // Eye overlay → invisible (face texture already has eyes)
+            if (matName.includes('eye')) {
+              eyeMeshes.push(child);
+              return new THREE.MeshBasicMaterial({
+                transparent: true, opacity: 0.0, depthWrite: false,
+              });
+            }
+
+            // Match texture by mesh name or material name
+            let tex = texBody;
+            if (meshName.includes('hair') || matName.includes('hair')) tex = texHair;
+            else if (meshName.includes('face') || matName.includes('face')) tex = texFace;
+            else if (meshName.includes('dress') || matName.includes('dress') || matName.includes('shirt') || matName.includes('skirt') || matName.includes('ribbon')) tex = texDress;
+            else if (meshName.includes('coat') || matName.includes('coat')) tex = texCoat;
+            else if (meshName.includes('body') || matName.includes('body')) tex = texBody;
+
+            return new THREE.MeshBasicMaterial({
+              map: tex, color: 0xffffff, side: THREE.DoubleSide,
+            });
           });
         });
 
-        // Identify eye meshes for blink animation
-        fbx.traverse((child: any) => {
-          if (!child.isMesh) return;
-          const n = (child.name || '').toLowerCase();
-          if (n.includes('eye')) {
-            eyeMeshes.push(child);
-          }
-        });
-
-        console.log('Eye meshes found:', eyeMeshes.length);
-
-        // ===== SAVE BASE ROTATIONS (from Blender-posed model) =====
+        // ===== SAVE BASE ROTATIONS =====
         for (const [name, bone] of Object.entries(boneMap)) {
           baseBoneRotations[name] = bone.rotation.clone();
         }
@@ -142,10 +156,10 @@ export default function Elaina3D() {
         };
         container.addEventListener('mousemove', onMouseMove);
 
-        // ===== EYE BLINK SYSTEM =====
+        // ===== EYE BLINK =====
         let blinkTimer = 0;
         let nextBlinkAt = 2 + Math.random() * 3;
-        let blinkPhase = -1; // -1 = not blinking
+        let blinkPhase = -1;
 
         function updateBlink(dt: number) {
           blinkTimer += dt;
@@ -154,7 +168,7 @@ export default function Elaina3D() {
             blinkTimer = 0;
           }
           if (blinkPhase >= 0) {
-            blinkPhase += dt * 12; // fast blink
+            blinkPhase += dt * 12;
             if (blinkPhase >= 4) {
               blinkPhase = -1;
               blinkTimer = 0;
@@ -162,16 +176,16 @@ export default function Elaina3D() {
               eyeMeshes.forEach(m => { m.scale.y = 1; });
             } else {
               let sy = 1;
-              if (blinkPhase < 1) sy = 1 - blinkPhase;        // closing
-              else if (blinkPhase < 2) sy = 0.02;              // closed
-              else if (blinkPhase < 3) sy = blinkPhase - 2;    // opening
-              else sy = 1 - (blinkPhase - 3);                  // settling
+              if (blinkPhase < 1) sy = 1 - blinkPhase;
+              else if (blinkPhase < 2) sy = 0.02;
+              else if (blinkPhase < 3) sy = blinkPhase - 2;
+              else sy = 1 - (blinkPhase - 3);
               eyeMeshes.forEach(m => { m.scale.y = Math.max(0.02, sy); });
             }
           }
         }
 
-        // ===== ANIMATION LOOP =====
+        // ===== ANIMATION =====
         let time = 0;
         let lastTime = performance.now();
         const baseY = fbx.position.y;
@@ -184,7 +198,7 @@ export default function Elaina3D() {
           time += dt;
 
           if (model) {
-            // Body follows mouse (subtle rotation)
+            // Body follows mouse
             model.rotation.y += (mouseX * 0.3 - model.rotation.y) * 0.04;
 
             // Breathing float
@@ -195,13 +209,13 @@ export default function Elaina3D() {
             model.rotation.z = Math.sin(time * 0.7) * 0.006;
 
             if (hasSkeleton) {
-              // Head: base pose + mouse tracking + tilt wobble
+              // Head: mouse tracking + wobble
               const head = boneMap['Head'];
               if (head && baseBoneRotations['Head']) {
                 head.rotation.copy(baseBoneRotations['Head']);
-                head.rotation.y += mouseX * 0.4;    // look left/right
-                head.rotation.x += mouseY * -0.2;   // look up/down
-                head.rotation.z += Math.sin(time * 0.8) * 0.04; // wobble
+                head.rotation.y += mouseX * 0.4;
+                head.rotation.x += mouseY * -0.2;
+                head.rotation.z += Math.sin(time * 0.8) * 0.04;
               }
 
               // Neck: subtle follow
@@ -264,7 +278,6 @@ export default function Elaina3D() {
               });
             }
 
-            // Eye blink
             updateBlink(dt);
           }
 
@@ -272,7 +285,7 @@ export default function Elaina3D() {
         }
         animate();
 
-        // Resize handler
+        // Resize
         const onResize = () => {
           if (!container.clientWidth) return;
           camera.aspect = container.clientWidth / container.clientHeight;
@@ -299,7 +312,7 @@ export default function Elaina3D() {
           if (styleTag.parentNode) styleTag.parentNode.removeChild(styleTag);
         };
       }, undefined, (err) => {
-        if (!cancelled) console.error('GLB error:', err);
+        if (!cancelled) console.error('FBX load error:', err);
       });
     }
 
